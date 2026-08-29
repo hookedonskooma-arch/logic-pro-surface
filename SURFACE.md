@@ -78,7 +78,7 @@ Custom `config.lua` is reverse-engineered from bundled scripts. **TESTED** by th
 
 - [Mackie Control overview](https://support.apple.com/guide/logicpro-css/mackie-control-overview-ctls7222820e/mac). Powered MCU is auto-detected. Apple's "Mackie Control" includes devices in MCU emulation mode.
 - [Control Surfaces Support Guide (PDF)](https://help.apple.com/pdf/logicpromac-css/en_US/logic-pro-mac-control-surfaces-support-guide.pdf)
-- [OSC message paths](https://support.apple.com/guide/logicpro/osc-message-paths-ctlsf67f4bdc/mac): UDP/IPv4 only.
+- [OSC message paths](https://support.apple.com/guide/logicpro/osc-message-paths-ctlsf67f4bdc/mac): UDP/IPv4 only, Apple's path set. Invented paths like `/track/N/volume` are not that protocol.
 
 Apple documents hardware/firmware MCU emulation, not a virtual software controller. A CoreMIDI virtual source that speaks MCU can be added in Setup. That is our strategic in-Logic control path, and it stays **EXPERIMENTAL** until [EVALS.md](EVALS.md) E05/E06 pass.
 
@@ -105,39 +105,64 @@ MongLong's own track resource reports `source:"ax_live"`. That is a UI receipt.
 
 ## 3. Incumbent teardown
 
-We are not racing them on their field.
+Source-backed, 2026-08-29. Stars and dates from GitHub. We did not re-run anyone's live suite. We are not racing them on their field.
+
+### Channel matrix (VERIFIED from their source trees)
+
+| | MCU | AX | AppleScript | CoreMIDI | CGEvent | Scripter | KeyCmd | OSC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| MongLong | yes | yes | yes | yes | yes | yes* | yes* | no (removed) |
+| koltyj | no | yes | yes | yes | yes | no | no | yes† |
+| rubenknol | yes | yes | no | yes + MMC | yes | no | no | no |
+
+\* optional / consent or Scripter insert required. † koltyj OSC paths are not Apple's Logic OSC guide.
+
+### Honesty ranking vs Apple docs
+
+1. **rubenknol** is closest to the documented MCU surface, then overclaims it as a note API.
+2. **MongLong** is the only fail-closed public contract, then overclaims AX receipts as verified music. Their own ADR-014 says a positive independent MIDI match is structurally impossible in release.
+3. **koltyj** is the least honest control plane: no MCU, invented OSC, and `unverified` still counts as router success. Most stars.
 
 ### MongLong0214/logic-pro-mcp
 
-**Tag: TESTED (their claims, from their README on 2026-08-29). We have not re-run their live suite.**
+**Tag: VERIFIED from their README, API.md, Channels/, and ADRs on 2026-08-29.**
 
-- https://github.com/MongLong0214/logic-pro-mcp
-- MIT. Swift. Stable **v3.14.0** (2026-08-22). Homebrew tap. Site: https://logicpromcp.com/
-- README badge: 3917 Swift tests, 63 stars at lookup.
-- They say, correctly: Logic does not ship a first-party API for agentic composition, session setup, mixer ops, or live project readback.
-- Seven channels behind one MCP: MCU, Accessibility, AppleScript, CoreMIDI, CGEvent, Scripter, MIDI Key Commands.
-- Honest Contract: confirmed / uncertain / failed. This part is good engineering.
-- Doctor requires Accessibility, Automation → Logic, Automation → System Events, and PostEvent.
-- Track and mixer readback is AX. Plugin insert verification is AX inventory diff.
-- Last full strict live E2E they cite is the v3.8.0 line (372/373). Later surfaces are spike-tested or deferred. 3917 tests are mostly deterministic Swift, not live Logic.
-- Selected for Anthropic Claude for Open Source.
-
-Honesty gap: they are the best outside MCP, and they still score UI state. MIDI export read-back and Channel EQ verified params are deferred in their own changelog.
+- https://github.com/MongLong0214/logic-pro-mcp · 63 stars, 13 forks, last push 2026-08-29 08:21 ET
+- MIT, LICENSE still "Copyright (c) 2025 Kolton Jacobs" (same copyright as koltyj). Lineage, not a clean-room.
+- Swift. Stable **v3.14.0** (2026-08-22). Homebrew. Site: https://logicpromcp.com/
+- 10 tools, 18 resources, 12 templates, 107 registered commands (ADR-003). README badge: 3917 tests.
+- Honest Contract: State A confirmed / B uncertain / C fail-closed. Good engineering.
+- State A evidence is AX same-surface readback and MCU echo, not SMF / Event List musical truth. Event List completeness is dark. Composition is SMF import + AX region receipt.
+- Last full strict live E2E they cite: v3.8.0 (372/373). `docs/qualification/baseline.json` is v3.11.0 / "No live-Logic qualification performed." Live runner is still a skeleton with `not_qualified` placeholders.
+- Honestly deferred: MIDI export note readback, Channel EQ verified params, `read_selection_notes`.
+- OSC case is removed (`testChannelIDNoOSC`).
 
 ### koltyj/logic-pro-mcp
 
-**Tag: UNKNOWN beyond listing.** ~80 stars, Swift, "8 dispatcher tools + 7 resources across 5 native macOS channels." https://github.com/koltyj/logic-pro-mcp
+**Tag: VERIFIED from README + Channels/ + tests.**
+
+- https://github.com/koltyj/logic-pro-mcp · 80 stars, 20 forks. MIT © 2025 Kolton Jacobs.
+- Last push 2026-08-24. Only release **v0.1.0** (2026-02-16). Repo ~97 KB vs MongLong ~86 MB.
+- Five channels: CoreMIDI, AX, CGEvent, AppleScript, OSC. **No MCU, no Scripter, no KeyCmd.**
+- `ChannelResult.unverified` still has `isSuccess == true`. OSC `send()` is success on UDP with zero Logic readback.
+- Tests bless unverified sends. No live Logic, no MCU echo, no SMF truth.
 
 ### rubenknol/logic-pro-mcp
 
-**Tag: UNKNOWN beyond README listing.** TypeScript MCP + Python MCU worker. Favors Mackie Control over clicking. https://github.com/rubenknol/logic-pro-mcp
+**Tag: VERIFIED from README + python/logic/. 1 star, not 80.**
+
+- https://github.com/rubenknol/logic-pro-mcp · created 2026-06-23. License **UNKNOWN** (no LICENSE file).
+- MCU-first worker (`mcu.py`) plus AX export panel, IAC record, CGEvent key fallback. No AppleScript, Scripter, or KeyCmd.
+- `midi_write_region` writes a `.mid` file. It does not import into Logic. "Read region" is File → Export All MIDI Tracks + mido parse.
+- No CI. Smoke scripts are operator-eyeball and Accessibility-gated.
+- Transport tool text still says "synthetic key commands" while the worker is MCU-first. Stale docs.
 
 Rebuilding any of these is how we come in third.
 
 ## 4. Our lane
 
-1. In-Logic surfaces first: AU MIDI Processor (`aumi`), Scripter helpers, Lua MDS / virtual MCU / OSC.
-2. Harness that scores musical truth: note on the track, MIDI out of the AU, transport via MCU echo, bounce audio hash. Not `ax_live`.
+1. In-Logic surfaces first: AU MIDI Processor (`aumi`), Scripter helpers, Lua MDS / virtual MCU / Apple OSC paths.
+2. Harness that scores musical truth: note on the track, MIDI out of the AU, transport via MCU echo, bounce audio hash. Not `ax_live`. This is the gap ADR-014 says MongLong cannot close in release.
 3. MCP last, and only for channels the harness passed.
 4. Open-source this map, then the AU brick, then the evals. Not the Ollama band stack.
 
@@ -149,5 +174,6 @@ Rebuilding any of these is how we come in third.
 - "Apple documents the Lua MDS API."
 - "The Logic MCP is a first-party API."
 - "Accessibility verified the region."
+- "unverified delivery is success."
 
 See [EVALS.md](EVALS.md) for the first ten fail-closed tests.
