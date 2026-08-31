@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.grouxx.logicsurface.midifx</string>
+    <key>CFBundleName</key>
+    <string>LogicSurfaceMidiFx</string>
+    <key>CFBundleVersion</key>
+    <string>0.0.1</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>AudioComponents</key>
+    <array>
+        <dict>
+            <key>description</key>
+            <string>Logic Surface MIDI FX stub: 4-note phrase, AU only</string>
+            <key>manufacturer</key>
+            <string>Grxx</string>
+            <key>name</key>
+            <string>GROUXX: LogicSurfaceMidiFx</string>
+            <key>subtype</key>
+            <string>Lsmf</string>
+            <key>type</key>
+            <string>aumi</string>
+            <key>version</key>
+            <integer>1</integer>
+            <key>sandboxSafe</key>
+            <true/>
+        </dict>
+    </array>
+</dict>
+</plist>

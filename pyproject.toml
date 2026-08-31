@@ -1,0 +1,18 @@
+[project]
+name = "logic-probe"
+version = "0.0.1"
+description = "Fail-closed Logic Pro probe envelopes. Not a Logic API."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Christian Grau" }]
+
+[tool.setuptools.packages.find]
+where = ["logic-probe"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["logic-probe"]
+markers = [
+    "live_logic: requires macOS + Logic Pro 12.3; skip is not pass",
+]

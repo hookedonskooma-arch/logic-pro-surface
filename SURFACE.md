@@ -3,6 +3,7 @@
 Date: 2026-08-29
 Author: GROUXX / Christian Grau
 Status: Phase 1 reviewer artifact. Not a claim that we have shipped a bridge.
+Honesty rules: see [docs/HONEST_CONTRACT.md](docs/HONEST_CONTRACT.md).
 
 Logic Pro has no documented public API for project control, session setup, mixer automation, or live project readback. Anyone who tells an agent "just use the Logic API" is wrong.
 
