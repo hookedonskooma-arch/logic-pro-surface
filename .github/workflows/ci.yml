@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux-tests:
+    name: linux-safe tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install pytest
+        run: python -m pip install --upgrade pip pytest
+      - name: unit tests (not live Logic)
+        run: PYTHONPATH=logic-probe python -m pytest tests -m "not live_logic"
+      - name: probe envelope without Logic
+        run: |
+          PYTHONPATH=logic-probe python -m logic_probe mixer set-volume --track 3 --db -6 > /tmp/probe.json
+          python - << 'PY'
+          import json
+          env = json.load(open("/tmp/probe.json"))
+          required = ("before", "adapter_result", "readback", "verification", "status")
+          missing = [k for k in required if k not in env]
+          assert not missing, missing
+          assert env["status"] == "uncertain", env["status"]
+          assert env["status"] != "confirmed"
+          print("probe status=uncertain (Linux, no Logic)")
+          PY
