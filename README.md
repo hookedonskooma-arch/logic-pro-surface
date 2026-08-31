@@ -4,7 +4,8 @@ Honest Logic Pro agent surfaces, plus the harness that refuses to call Accessibi
 
 This is not a clone of [MongLong0214/logic-pro-mcp](https://github.com/MongLong0214/logic-pro-mcp). That project already owns the outside-the-app MCP race. We live inside Logic: Audio Units, Scripter, MIDI Device Scripts, and a virtual control surface. MCP is a thin adapter over channels the harness has already passed.
 
-Start here: [SURFACE.md](SURFACE.md).
+Start here: [SURFACE.md](SURFACE.md). The chat bot that sits on top of it:
+[CHATBOT.md](CHATBOT.md).
 
 ## Status tags
 
@@ -21,5 +22,9 @@ We never collapse these into "supported":
 2. AU MIDI FX brick (extracted from MELEGI).
 3. Ten fail-closed evals that score musical truth, not AX receipts.
 4. MCP adapter last.
+
+The chat bot ships alongside: `python3 -m chatbot` holds key, mode, tempo and
+meter, checks what you play against them, and takes local offline voice or
+text. It fails closed — no key set means a question back, never a guessed key.
 
 Logic's native third-party plugin path is Audio Units, not VST.
