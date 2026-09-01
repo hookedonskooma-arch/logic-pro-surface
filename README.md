@@ -10,6 +10,8 @@ Honesty rules: [docs/HONEST_CONTRACT.md](docs/HONEST_CONTRACT.md). Tonight vs la
 
 Studio workforce memory is [studio/](studio/). Roles, honest MCP checkboxes, taste, project state, and tasks live there. That folder is a shared brain, not a Logic API and not a claim that we can mix. SURFACE.md is the channel map; this pointer does not rewrite it.
 
+Spoken mouth (v0): macOS `say`, not MELEGI. See [studio/VOICE.md](studio/VOICE.md).
+
 ## Status tags
 
 We never collapse these into "supported":

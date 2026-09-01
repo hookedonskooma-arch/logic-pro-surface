@@ -8,3 +8,4 @@ build/
 *.a
 .DS_Store
 .venv/
+studio/datasets/*.jsonl
