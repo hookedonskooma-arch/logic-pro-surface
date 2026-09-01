@@ -29,7 +29,7 @@ One page. Not a claim that the bridge works.
 | E02 | AU MIDI FX 4-note phrase hash | UNKNOWN |
 | E03 | Scripter JS +12 transpose | UNKNOWN |
 | E04 live | Confirm Scripter cannot rename/create tracks inside Logic | Linux unit test exists; live remains UNKNOWN |
-| E05 / E06 | Virtual MCU transport + fader echo | EXPERIMENTAL (community), not ours |
+| E05 / E06 | Virtual MCU transport + fader echo | E05 still stub. E06 implemented; TESTED only if live envelope is `confirmed` |
 | E07 | Lua MDS mapped button | UNKNOWN |
 | E08 live | `nm` / pluginval on a `.component` | Static scan exists; binary UNKNOWN |
 | E09 live | allocator hook / TSan on the render thread | Static scan exists; live UNKNOWN |

@@ -48,7 +48,7 @@ PYTHONPATH=logic-probe python -m logic_probe ax inspect-selected-track
 
 JSON always includes `before`, `adapter_result`, `readback`, `verification`, and `status` in `{confirmed, uncertain, failed}`.
 
-Without Logic, `status` is `uncertain`. The process exiting 0 only means an envelope was printed — that is adapter-level, not semantic success. `confirmed` requires independent readback. v0 has no MCU / CoreMIDI / AX actuation implemented, so it will not emit `confirmed`.
+Without Logic, `status` is `uncertain`. The process exiting 0 only means an envelope was printed — that is adapter-level, not semantic success. `confirmed` requires independent MCU echo (`readback.method=mcu_feedback`). AX receipts cannot be the pass bit. Mixer `-6 dB` is an MCU fader, not MELEGI audio pass-through. See [docs/MCU.md](docs/MCU.md).
 
 ## Tests
 

@@ -79,6 +79,8 @@ def uncertain(
     before: dict[str, Any] | None = None,
     logic_reachable: bool = False,
     extra_notes: list[str] | None = None,
+    logic_version: str | None = None,
+    macos_version: str | None = None,
 ) -> dict[str, Any]:
     notes = [
         "skip is not pass",
@@ -100,4 +102,75 @@ def uncertain(
         verification={"passed": False, "reason": reason},
         status="uncertain",
         notes=notes,
+        logic_version=logic_version,
+        macos_version=macos_version,
+    )
+
+
+
+def failed(
+    *,
+    probe_id: str,
+    channel: str,
+    operation: str,
+    requested: dict[str, Any],
+    reason: str,
+    before: dict[str, Any] | None = None,
+    adapter_result: dict[str, Any] | None = None,
+    readback: dict[str, Any] | None = None,
+    extra_notes: list[str] | None = None,
+    logic_version: str | None = None,
+    macos_version: str | None = None,
+) -> dict[str, Any]:
+    notes = [
+        "skip is not pass",
+        "sent command is not confirmed",
+        "adapter success is not semantic success",
+    ]
+    if extra_notes:
+        notes.extend(extra_notes)
+    return build_envelope(
+        probe_id=probe_id,
+        channel=channel,
+        operation=operation,
+        requested=requested,
+        before=before,
+        adapter_result=adapter_result or {"success": True, "reason": reason},
+        readback=readback,
+        verification={"passed": False, "reason": reason},
+        status="failed",
+        notes=notes,
+        logic_version=logic_version,
+        macos_version=macos_version,
+    )
+
+
+def confirmed(
+    *,
+    probe_id: str,
+    channel: str,
+    operation: str,
+    requested: dict[str, Any],
+    before: dict[str, Any],
+    adapter_result: dict[str, Any],
+    readback: dict[str, Any],
+    extra_notes: list[str] | None = None,
+    logic_version: str | None = None,
+    macos_version: str | None = None,
+) -> dict[str, Any]:
+    """Independent readback required. ax_live is rejected by build_envelope."""
+    notes = extra_notes or []
+    return build_envelope(
+        probe_id=probe_id,
+        channel=channel,
+        operation=operation,
+        requested=requested,
+        before=before,
+        adapter_result=adapter_result,
+        readback=readback,
+        verification={"passed": True, "reason": "independent_readback_matched"},
+        status="confirmed",
+        notes=notes,
+        logic_version=logic_version,
+        macos_version=macos_version,
     )
