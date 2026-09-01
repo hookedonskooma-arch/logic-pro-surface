@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,31 @@ def _darwin_logic_running() -> bool:
     return False
 
 
+
+def _macos_version() -> str | None:
+    try:
+        import platform
+
+        ver = platform.mac_ver()[0]
+        return ver or None
+    except Exception:
+        return None
+
+
+def _logic_version() -> str | None:
+    info = Path("/Applications/Logic Pro.app/Contents/Info.plist")
+    if not info.is_file():
+        return None
+    try:
+        import plistlib
+
+        data = plistlib.loads(info.read_bytes())
+    except Exception:
+        return None
+    v = data.get("CFBundleShortVersionString")
+    return str(v) if v else None
+
+
 def detect() -> dict[str, Any]:
     """Return host facts. logic_reachable is True only with evidence."""
     platform = sys.platform
@@ -58,6 +84,8 @@ def detect() -> dict[str, Any]:
     # Process present is not a control channel. v0 still cannot confirm writes.
     info["logic_reachable"] = True
     info["reason"] = "logic_process_seen_no_channel"
+    info["macos_version"] = _macos_version()
+    info["logic_version"] = _logic_version()
     return info
 
 

@@ -18,7 +18,7 @@ def _parser() -> argparse.ArgumentParser:
 
     mixer = sub.add_parser("mixer", help="mixer probes")
     mixer_sub = mixer.add_subparsers(dest="action", required=True)
-    vol = mixer_sub.add_parser("set-volume", help="set track volume (v0: uncertain without readback)")
+    vol = mixer_sub.add_parser("set-volume", help="set track volume via MCU fader; confirmed only on echo")
     vol.add_argument("--track", type=int, required=True)
     vol.add_argument("--db", type=float, required=True)
 

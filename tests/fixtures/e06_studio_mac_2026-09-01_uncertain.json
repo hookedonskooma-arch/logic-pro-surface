@@ -1,0 +1,57 @@
+{
+  "probe_id": "mixer_set_volume",
+  "timestamp": "2026-09-01T15:33:43Z",
+  "logic_version": "12.2",
+  "macos_version": "15.7.5",
+  "channel": "mcu",
+  "operation": "track.set_volume",
+  "requested": {
+    "track": 3,
+    "db": -6.0
+  },
+  "before": {
+    "db": null,
+    "source": null,
+    "fader14": null
+  },
+  "adapter_result": {
+    "success": true,
+    "reason": "mcu_no_echo"
+  },
+  "readback": null,
+  "verification": {
+    "passed": false,
+    "reason": "mcu_no_echo"
+  },
+  "status": "uncertain",
+  "notes": [
+    "skip is not pass",
+    "sent command is not confirmed",
+    "adapter success is not semantic success",
+    "host.reason=logic_process_seen_no_channel",
+    "confirmed is reserved for independent readback after a harness eval passes",
+    "MELEGI stays aumi MIDI FX; mixer dB is an MCU fader, not AU pass-through",
+    "cs_prefs.exists=True magic='MROF\\r-\\x01\\x00FCSS'",
+    "cs_catalog=['Logic Control', 'HUI', 'iControl', 'Logic Remote', 'TouchOSC', 'Launchpad']",
+    "cs_named_ports=['SSL 2+', 'Logic Pro Virtual In']",
+    "cs_installed_hints=['iPad', ' Remote (iPad Pro11)', 'Control Surface: iPad']",
+    "cs_iac_mentioned=False",
+    "Logic Control in the .cs catalog is the module list, not proof of an installed surface",
+    "Installed CS observed: Logic Remote / iPad; SSL 2+ MIDI is in the blob but was CoreMIDI-offline",
+    "Assign Mackie Control in Logic Pro > Control Surfaces > Setup: Input = IAC Driver logic-probe-mcu-cmd, Output = IAC Driver logic-probe-mcu-fb",
+    "Do not Rebuild Defaults (destructive to existing iPad / SSL assignments)",
+    "midi.inputs=['IAC Driver Bus 1', 'IAC Driver logic-probe-mcu-fb', 'IAC Driver logic-probe-mcu-cmd', 'Logic Pro Virtual Out']",
+    "midi.outputs=['IAC Driver Bus 1', 'IAC Driver logic-probe-mcu-fb', 'IAC Driver logic-probe-mcu-cmd', 'Logic Pro Virtual In']",
+    "iac={'attempted': True, 'iac_found': True, 'iac_was_offline': False, 'iac_online': True, 'entities': ['Bus 1', 'logic-probe-mcu-fb', 'logic-probe-mcu-cmd'], 'added': [], 'error': None, 'ssl2_plus_touched': False}",
+    "never send MCU pitch-bend to Logic Pro Virtual In (sequencer port, not CS)",
+    "MCU byte protocol is EXPERIMENTAL (not an Apple spec)",
+    "same-bus IAC loopback is not independent readback",
+    "AX receipts cannot be the pass bit",
+    "mcu_pair={'cmd_out': 'IAC Driver logic-probe-mcu-cmd', 'fb_in': 'IAC Driver logic-probe-mcu-fb', 'kind': 'iac_two_bus'}",
+    "strip=2 bank_assumed=0",
+    "saw_mcu=False msg_count=0",
+    "bytes left this process on IAC cmd; Logic did not echo MCU on fb",
+    "most likely: no Mackie Control / Logic Control surface assigned to those IAC ports",
+    "E06 remains UNKNOWN (skip is not pass)"
+  ]
+}
