@@ -18,7 +18,7 @@ This repo would rather ship `UNKNOWN` than a lie.
 - Never invent Logic state. Never mark TESTED without a cited live run against Logic.
 - Skip is not pass. A skipped live eval stays UNKNOWN / fails closed.
 - Do not add Ollama, songs, secrets, or home-directory dumps.
-- Do not copy the MELEGI app stack (band / backend / web UI). Extract AU MIDI FX only, later.
+- Do not copy the MELEGI app stack (band / backend / Ollama / vibe-producer). AU MIDI FX extract lives in `audio-unit/melegi/`.
 - MCP last, and only over channels the harness has passed.
 - This is not a clone of MongLong0214/logic-pro-mcp.
 

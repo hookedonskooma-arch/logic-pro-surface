@@ -11,7 +11,7 @@ Target host for later live rows: macOS, Logic Pro 12.3.
 | AU / AUv3 hosting in Logic | Audio Units | none | Logic plug-in slot | VERIFIED | — | 12.x (Apple) | Apple docs. Not VST. |
 | AU MIDI Processor type | `kAudioUnitType_MIDIProcessor` | none | MIDI to instrument below | VERIFIED | — | 12.x (Apple) | MIDI FX sit before the instrument. |
 | AU stub 4-note phrase (C3 E3 G3 C4) | in-process kernel | none | E02 phrase hash | EXPERIMENTAL | — | — | Coded in `audio-unit/`. Not live-tested. |
-| MELEGI AU MIDI FX (extracted) | AU MIDI FX | none | E02 | UNKNOWN | — | — | Source not in this drop. |
+| MELEGI AU MIDI FX (extracted) | AU MIDI FX | none | E02 | EXPERIMENTAL | — | — | Sources in `audio-unit/melegi/`. AU only, MIDI FX, not TTS, not Ollama. Live Logic phrase hash UNKNOWN. |
 | Scripter HandleMIDI / ProcessMIDI | Scripter JS | none | MIDI out of slot | VERIFIED | — | 12.x (Apple) | JavaScript, not Lua. |
 | Scripter +12 transpose | Scripter JS | none | C3→C4 on instrument | UNKNOWN | — | — | E03. Fixture shipped; live UNKNOWN. |
 | Scripter project rename / new track | (none) | none | must fail | VERIFIED (API absence) | — | — | E04. Not a project API. |

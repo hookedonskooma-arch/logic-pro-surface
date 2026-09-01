@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MELEGI</title>
+<style>
+/* MIDI FX only. No private backend. Not TTS. */
+:root{
+  --bg:#0b0a09; --panel:#121212; --line:#1e1e1e;
+  --txt:#d8d8d8; --dim:#8a8a8a; --faint:#5f5f5f;
+  --purple:#a970ff; --purple-soft:#c7aaff; --purple-deep:#7a3fd1;
+  --green:#57e389; --amber:#e3b957; --red:#d62828;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
+  --head:-apple-system,'Helvetica Neue',sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--head);height:100vh;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:#0d0d0d}
+.logo{font-family:Georgia,'Times New Roman',serif;font-weight:700;font-size:24px;color:#d9cff0;letter-spacing:1px}
+.tag{font-size:11px;letter-spacing:3px;color:var(--faint);text-transform:uppercase}
+.spacer{flex:1}
+.pill{font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:4px 10px;border-radius:3px;border:1px solid var(--line);color:var(--dim)}
+.pill.ok{border-color:#1c4a2e;color:var(--green)}
+.pill.bad{border-color:#4a1c1c;color:var(--red)}
+main{flex:1;padding:20px;display:flex;flex-direction:column;gap:16px;max-width:720px}
+h2{font-size:11px;letter-spacing:4px;color:var(--faint);text-transform:uppercase;margin:0 0 8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px}
+.kv{display:flex;justify-content:space-between;font-family:var(--mono);font-size:13px;padding:4px 0}
+.kv .k{color:var(--dim)}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+button{background:var(--purple-deep);border:none;border-radius:6px;color:#fff;font-family:var(--head);font-weight:600;letter-spacing:1px;padding:10px 16px;cursor:pointer}
+button.ghost{background:none;border:1px solid var(--line);color:var(--dim)}
+button.on{border-color:var(--purple-deep);color:var(--purple-soft)}
+button:disabled{background:#2a2a2a;color:var(--faint)}
+.note{font-family:var(--mono);font-size:12px;color:var(--dim);line-height:1.5}
+footer{padding:10px 20px;border-top:1px solid var(--line);font-size:10px;letter-spacing:2px;color:var(--faint)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">MELEGI</div>
+  <div class="tag">AU MIDI FX</div>
+  <div class="spacer"></div>
+  <span id="pill-host" class="pill">HOST: —</span>
+</header>
+<main>
+  <div class="card">
+    <h2>Host</h2>
+    <div id="ctx">
+      <div class="kv"><span class="k">BPM</span><span class="v">—</span></div>
+      <div class="kv"><span class="k">TRANSPORT</span><span class="v">—</span></div>
+      <div class="kv"><span class="k">LOOP</span><span class="v">—</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Phrase</h2>
+    <p class="note">Queues MIDI to the instrument below this MIDI FX slot. Not audio pass-through. Not TTS. Not Ollama.</p>
+    <div class="row">
+      <button id="e02" type="button">QUEUE C3 E3 G3 C4</button>
+      <button id="loopbtn" class="ghost" type="button">LOOP</button>
+    </div>
+    <p id="status" class="note"></p>
+  </div>
+</main>
+<footer>GROUXX · MIDI PROCESSOR · aumi</footer>
+<script>
+const IN_PLUGIN = typeof window.__JUCE__ !== 'undefined';
+function callNative(name, ...params){
+  if (!IN_PLUGIN) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const resultId = Math.floor(Math.random() * 1e9);
+    const listenerId = window.__JUCE__.backend.addEventListener('__juce__complete', (data) => {
+      if (data.resultId === resultId){
+        window.__JUCE__.backend.removeEventListener(listenerId);
+        resolve(data.result);
+      }
+    });
+    window.__JUCE__.backend.emitEvent('__juce__invoke', { name, params, resultId });
+  });
+}
+
+let hostCtx = { bpm: 120, playing: false, loop: false, ppq: 0 };
+const $ = (id) => document.getElementById(id);
+
+async function pollHost(){
+  const pill = $('pill-host');
+  if (!IN_PLUGIN){
+    pill.textContent = 'HOST: editor preview';
+    pill.className = 'pill';
+    return;
+  }
+  try{
+    const c = await callNative('getHostContext');
+    if (c && c.bpm){
+      hostCtx = c;
+      pill.textContent = 'HOST: ' + (Math.round(c.bpm * 10) / 10) + ' bpm';
+      pill.className = 'pill ok';
+      $('ctx').innerHTML =
+        '<div class="kv"><span class="k">BPM</span><span class="v">' + (Math.round(c.bpm * 10) / 10) + '</span></div>' +
+        '<div class="kv"><span class="k">TRANSPORT</span><span class="v">' + (c.playing ? 'PLAYING' : 'STOPPED') + '</span></div>' +
+        '<div class="kv"><span class="k">LOOP</span><span class="v">' + (c.loop ? 'ON' : 'OFF') + '</span></div>';
+      $('loopbtn').classList.toggle('on', !!c.loop);
+    }
+  }catch(e){}
+}
+
+const E02 = [
+  {pitch: 60, startBeats: 0, durBeats: 0.5, vel: 100},
+  {pitch: 64, startBeats: 1, durBeats: 0.5, vel: 100},
+  {pitch: 67, startBeats: 2, durBeats: 0.5, vel: 100},
+  {pitch: 72, startBeats: 3, durBeats: 0.5, vel: 100}
+];
+
+$('e02').onclick = async () => {
+  const ok = await callNative('queuePhrase', E02);
+  $('status').textContent = ok === true ? 'queued C3 E3 G3 C4' : (IN_PLUGIN ? 'queue failed' : 'open this AU in Logic to queue');
+};
+$('loopbtn').onclick = async () => {
+  const on = await callNative('setLoop', !hostCtx.loop);
+  if (on === null) return;
+  hostCtx.loop = on;
+  $('loopbtn').classList.toggle('on', !!on);
+};
+
+pollHost();
+setInterval(pollHost, 1000);
+</script>
+</body>
+</html>

@@ -3,7 +3,8 @@ project(LogicSurfaceMidiFx VERSION 0.0.1 LANGUAGES C CXX)
 
 # AU MIDI Processor stub. FORMATS AU only. Never VST. Never VST3.
 # MIDI effect (kAudioUnitType_MIDIProcessor / aumi), not a synth.
-# MELEGI source is not in this drop. See docs/MELEGI-EXTRACTION.md.
+# Apple-shaped stub. MELEGI JUCE extract is audio-unit/melegi/ (own CMake, FORMATS AU only).
+# Never VST. Never VST3. See docs/MELEGI-EXTRACTION.md.
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

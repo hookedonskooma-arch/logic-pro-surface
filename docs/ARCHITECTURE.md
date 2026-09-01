@@ -49,7 +49,7 @@ Every actuation returns JSON with `before`, `adapter_result`, `readback`, `verif
 ## Build order
 
 1. Map + contract (tonight).
-2. AU MIDI FX brick (stub tonight; MELEGI extract later).
+2. AU MIDI FX brick (Apple stub in `audio-unit/`; MELEGI JUCE extract in `audio-unit/melegi/`).
 3. Ten fail-closed evals.
 4. MCP adapter last.
 

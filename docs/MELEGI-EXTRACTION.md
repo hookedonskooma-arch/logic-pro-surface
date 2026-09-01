@@ -1,55 +1,84 @@
 # MELEGI extraction
 
-Stub shipped because the MELEGI source is **not in this drop**.
+Extracted 2026-09-01 from the studio plugin tree. **AU MIDI FX only.**
 
-## Source (later, not copied)
+This extract is **not TTS**, **not audio pass-through**, **not Ollama**.
 
-Studio tree (sits next to Ollama / band / backend — do not copy those):
+## Source (read, not modified)
 
 `/Users/neonpissstudios/dev/melegi/newmelegi/plugin/`
 
-Extract **AU MIDI FX only**. Never the Ollama band stack. Never ai-stack, vibe-producer, beatstore, or backend.
+CMake (kept): `FORMATS AU`, `IS_MIDI_EFFECT TRUE`, `IS_SYNTH FALSE`, `NEEDS_MIDI_INPUT TRUE`, `NEEDS_MIDI_OUTPUT TRUE`.
 
-## What v0 ships instead
+JUCE lives at `/Users/neonpissstudios/dev/melegi/juce` (symlink `~/JUCE`). It is **not** vendored here.
 
-`audio-unit/` — a clean Apple-shaped MIDI Processor stub:
+## What was copied
 
-- Swift `AUAudioUnit` layer
-- Objective-C++ adapter
-- C++ kernel that can emit C3 E3 G3 C4 (E02 phrase)
-- CMake: AU only, MIDI effect, not a synth, not VST
+Into `audio-unit/melegi/`:
 
-This stub is not MELEGI. Live install of `MELEGI.component` remains **UNKNOWN** (see SURFACE.md).
+| Path | Notes |
+| --- | --- |
+| `Source/PluginProcessor.cpp` | Phrase FIFO, host-clock MIDI emit, `BusesProperties()` empty (no audio buses) |
+| `Source/PluginProcessor.h` | `isMidiEffect() == true` |
+| `Source/PluginEditor.cpp` | WebView native bridge (`queuePhrase`, host context, loop) |
+| `Source/PluginEditor.h` | |
+| `Source/VozBridgeClient.h` | Header-only localhost TCP param client (compile-required). Not TTS. |
+| `CMakeLists.txt` | Adapted: `JUCE_PATH` / optional FetchContent 8.0.13, `FORMATS AU` only, copy-after-build off by default |
+| `Resources/plugin_ui.html` | **Sanitized MIDI FX panel.** Queues C3 E3 G3 C4 via `queuePhrase`. |
+| `README.md` | JUCE fetch instructions |
 
-## What to lift later (from plugin/CMakeLists.txt, inspected 2026-08-31, not copied)
+`NEEDS_WEB_BROWSER TRUE` is existing MELEGI — kept because `PluginEditor` will not compile without it. Not expanded.
 
-Observed flags — keep these:
+`HARDENED_RUNTIME_OPTIONS com.apple.security.network.client` is existing MELEGI (VozBridge localhost TCP). Kept. Not an Ollama client.
 
-- `FORMATS AU`
-- `IS_MIDI_EFFECT TRUE`
-- `IS_SYNTH FALSE`
-- `NEEDS_MIDI_INPUT TRUE`
-- `NEEDS_MIDI_OUTPUT TRUE`
-- Sources named `Source/PluginProcessor.cpp`, `Source/PluginEditor.cpp`
+## What was left private
 
-Leave behind:
+Do not copy these into this repo:
 
-- Ollama, band, backend, web control surfaces that are not the MIDI FX
-- `NEEDS_WEB_BROWSER TRUE` / `Resources/plugin_ui.html` unless a later eval truly needs UI
-- `HARDENED_RUNTIME_OPTIONS com.apple.security.network.client` — a MIDI FX does not need network
-- Any path that would add VST or VST3 to `FORMATS`
+- Ollama / local LLM runtime
+- `ai-stack`, `vibe-producer`, `beatstore`
+- `newmelegi/backend/`, catalog, songs
+- `newmelegi/ui/` (control room `app.html` / `plugin.html`)
+- `plugin/Resources/plugin_ui.html` **original** — talks to `http://127.0.0.1:4780` and `ws://127.0.0.1:4780/ws` (private band backend, agent rack, vibe pad, MCP badges)
+- `plugin/make_ui.py` — copies from `../ui/plugin.html`
+- `plugin/voz-bridge/` — Node companion for a FORMANT/vocal slice; not MIDI FX
+- `plugin/build/`, installed `MELEGI.component`
+- The JUCE source tree (document fetch of **8.0.13** instead)
 
-SURFACE.md: a repo copy that calls MELEGI an "AU instrument" is wrong. It is a MIDI effect.
+## Stub vs extract
 
-## JUCE vs Apple stack
+`audio-unit/` Apple-shaped stub (Swift / Objective-C++ / C++ `PhraseKernel`, 4-note C3 E3 G3 C4) stays. Linux-safe E08/E09 scans still target that stub.
 
-MELEGI today is a JUCE AU MIDI effect. This repo's long-term stack is the Apple sample shape (Swift / Objective-C++ / C++). Extraction may:
+`audio-unit/melegi/` is the JUCE AU MIDI FX extract, added **alongside** the stub after a local AU build — the stub is not replaced.
 
-1. Keep JUCE for a first E02 pass (`FORMATS AU` only), or
-2. Re-host the MIDI FX behavior in the stub kernel.
+Taste Director: this is not a vocal/TTS plugin. Spoken mouth remains macOS `say` (`studio/VOICE.md`).
 
-Either way: AU only, MIDI effect, not a synth, no VST, no Ollama.
+## JUCE
 
-## E02 acceptance (later)
+Not a git submodule and not vendored. See `audio-unit/melegi/README.md`.
 
-Phrase hash of C3 E3 G3 C4 (`60 64 67 72`) on the instrument below the MIDI FX slot, on Logic Pro 12.3. Plugin window opened is forbidden evidence. Not claimed TESTED in v0.
+```bash
+git clone --branch 8.0.13 --depth 1 https://github.com/juce-framework/JUCE.git
+cmake -S audio-unit/melegi -B audio-unit/melegi/build \
+  -DJUCE_PATH=/path/to/JUCE -DCMAKE_BUILD_TYPE=Release
+cmake --build audio-unit/melegi/build --config Release
+```
+
+`-DMELEGI_FETCH_JUCE=ON` clones 8.0.13 into the build dir only.
+
+## Build (studio Mac, 2026-09-01)
+
+Configured with `-DJUCE_PATH=$HOME/JUCE` (8.0.13-family checkout). Artefact:
+
+`audio-unit/melegi/build/MELEGI_artefacts/Release/AU/MELEGI.component`
+
+Info.plist `AudioComponents.type` = **`aumi`**. Release folder contains `AU/` only — no VST / VST3 product. Stub in `audio-unit/` was left in place (augment, not replace).
+
+Copy-after-build was **off**, so this did not overwrite `~/Library/Audio/Plug-Ins/Components/MELEGI.component`.
+
+## Honesty
+
+- Compile of the AU MIDI FX brick: done on the studio Mac. Not a live Logic TESTED claim.
+- Live install / E02 phrase hash against Logic Pro 12.3: **UNKNOWN** until a cited run. Plugin window opened is forbidden evidence.
+- `processBlock` still calls `VozBridgeClient::sendParam` (localhost TCP). That is existing MELEGI, not render-path-clean like the stub kernel. E09 static scan stays on `audio-unit/cpp-dsp`, not this JUCE editor.
+- A green Linux CI run is not TESTED against Logic.
