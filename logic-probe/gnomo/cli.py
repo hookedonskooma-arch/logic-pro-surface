@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import ledger, mouth, persona, state
+from . import ledger, mouth, persona, state, walkthrough
 from .ladder import TIER_ACT, TIER_REFUSE, decide
 
 EXIT_OK = 0
@@ -48,7 +48,14 @@ def _park(idea: str) -> tuple[bool, str]:
         return True, str(path)
 
 
-def _emit(payload: dict[str, Any], spoken: str, *, as_json: bool, quiet: bool) -> int:
+def _emit(
+    payload: dict[str, Any],
+    spoken: str,
+    *,
+    as_json: bool,
+    quiet: bool,
+    header: bool = True,
+) -> int:
     # Hand-built payloads (say, park) do not come from ladder.decide(), so they
     # arrive unstamped. An undated ledger row is not an audit trail.
     payload.setdefault("timestamp", _utc_now_iso())
@@ -64,7 +71,8 @@ def _emit(payload: dict[str, Any], spoken: str, *, as_json: bool, quiet: bool) -
         sys.stdout.write("\n")
         return EXIT_OK
 
-    print(persona.hat_line(payload.get("hat", "engineer")))
+    if header:
+        print(persona.hat_line(payload.get("hat", "engineer")))
     print(spoken)
     if not payload["voice"].get("spoke"):
         print(f"(not spoken: {payload['voice'].get('reason')})")
@@ -142,6 +150,86 @@ def cmd_ledger(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_setup(args: argparse.Namespace) -> int:
+    """One step at a time. The gnome does the IAC half; Logic's window needs hands."""
+    if args.fix:
+        try:
+            from logic_probe import midi_io
+
+            fixed = midi_io.ensure_iac_mcu_buses()
+        except Exception as exc:  # noqa: BLE001 — report, never claim it worked
+            fixed = {"attempted": True, "error": f"{type(exc).__name__}: {exc}"}
+        if fixed.get("error"):
+            payload = {
+                "companion": "GNOMO",
+                "command": "setup",
+                "hat": args.hat,
+                "tier": 2,
+                "authority": "ask",
+                "mode": "you",
+                "action": "create the IAC MCU buses",
+                "iac_fix": fixed,
+            }
+            return _emit(
+                payload,
+                f"Could not make the buses: {fixed['error']}.",
+                as_json=args.json,
+                quiet=args.quiet,
+            )
+
+    results = walkthrough.evaluate()
+    step = walkthrough.current(results)
+
+    payload: dict[str, Any] = {
+        "companion": "GNOMO",
+        "command": "setup",
+        "hat": args.hat,
+        "tier": 0,
+        "authority": "act",
+        "mode": "for",
+        "action": "check the MCU setup and name the one next step",
+        "steps": results,
+        "current_step": step["step"] if step else None,
+    }
+    if args.fix:
+        payload["iac_fix"] = fixed
+
+    if step is None:
+        return _emit(
+            payload,
+            "MCU echo confirmed. Setup is done.",
+            as_json=args.json,
+            quiet=args.quiet,
+        )
+
+    spoken = step["spoken"]
+    if not args.json:
+        print(persona.hat_line(args.hat))
+        done = sum(1 for r in results if r["state"] == walkthrough.DONE)
+        print(f"step {done + 1} of {len(results)}: {step['title']}")
+        print()
+        for line in step["detail"]:
+            print(f"  {line}")
+        if step["trap"]:
+            print()
+            print(f"  TRAP: {step['trap']}")
+        if step["state"] == walkthrough.UNKNOWN:
+            print()
+            print(f"  I cannot verify this one from here ({step['evidence']}).")
+            print("  Step 5's MCU echo is the only honest pass bit.")
+        print()
+        if not args.all:
+            print("  Do that one. Then run this again.")
+        else:
+            print("  Remaining:")
+            for row in results:
+                mark = {"done": "x", "todo": " ", "unknown": "?"}[row["state"]]
+                print(f"    [{mark}] {row['step']}: {row['title']}")
+        print()
+
+    return _emit(payload, spoken, as_json=args.json, quiet=args.quiet, header=False)
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="gnomo",
@@ -170,6 +258,17 @@ def _parser() -> argparse.ArgumentParser:
     park = sub.add_parser("park", help="catch an idea without derailing the one thing")
     park.add_argument("idea")
     park.set_defaults(func=cmd_park)
+
+    setup = sub.add_parser("setup", help="guided setup, one step at a time")
+    setup_sub = setup.add_subparsers(dest="target", required=True)
+    mcu = setup_sub.add_parser("mcu", help="Mackie Control over IAC (E06)")
+    mcu.add_argument(
+        "--fix",
+        action="store_true",
+        help="let GNOMO create the two IAC buses (the half that needs no hands)",
+    )
+    mcu.add_argument("--all", action="store_true", help="also list the remaining steps")
+    mcu.set_defaults(func=cmd_setup)
 
     led = sub.add_parser("ledger", help="recent decisions")
     led.add_argument("--limit", type=int, default=10)
