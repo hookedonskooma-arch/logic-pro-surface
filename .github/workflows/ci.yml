@@ -17,6 +17,26 @@ jobs:
         run: python -m pip install --upgrade pip pytest
       - name: unit tests (not live Logic)
         run: PYTHONPATH=logic-probe python -m pytest tests -m "not live_logic"
+      - name: companion ladder fails closed
+        run: |
+          PYTHONPATH=logic-probe GNOMO_MUTE=1 python -m gnomo --json decide "frobnicate the widget" > /tmp/gnomo.json
+          python - << 'PY'
+          import json
+          d = json.load(open("/tmp/gnomo.json"))
+          assert d["tier"] == 2, d["tier"]
+          assert d["authority"] == "ask", d["authority"]
+          assert d["voice"]["spoke"] is False, d["voice"]
+          print("unmatched action -> tier 2 (ask); unknown is not a yes")
+          PY
+          PYTHONPATH=logic-probe GNOMO_MUTE=1 python -m gnomo --json decide "how does the mix sound" > /tmp/ears.json
+          python - << 'PY'
+          import json
+          d = json.load(open("/tmp/ears.json"))
+          assert d["tier"] == 3, d["tier"]
+          assert d["mode"] == "never", d["mode"]
+          print("hearing request -> tier 3 (refuse); this layer has no ears")
+          PY
+
       - name: probe envelope without Logic
         run: |
           PYTHONPATH=logic-probe python -m logic_probe mixer set-volume --track 3 --db -6 > /tmp/probe.json

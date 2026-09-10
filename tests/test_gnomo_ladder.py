@@ -1,0 +1,242 @@
+"""GNOMO decision ladder: authority is earned, never assumed.
+
+These tests guard the property that makes the companion usable: it cannot
+talk itself into acting. Unknown is not a yes, and a rung with no rollback
+is not a rung.
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from gnomo import ledger, mouth, persona, state
+from gnomo.cli import main as gnomo_main
+from gnomo.ladder import (
+    RULES,
+    TIER_ACT,
+    TIER_ASK,
+    TIER_PROPOSE,
+    TIER_REFUSE,
+    classify,
+    decide,
+)
+
+
+# --- fail closed ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "frobnicate the widget",
+        "do the thing we talked about",
+        "handle the vocals",
+        "",
+    ],
+)
+def test_unmatched_action_never_acts(action):
+    """An action the ladder does not recognise is handed back, not run."""
+    if not action:
+        with pytest.raises(ValueError):
+            decide(action)
+        return
+    assert decide(action)["tier"] == TIER_ASK
+
+
+def test_default_is_ask_not_act():
+    d = decide("something entirely novel and unlisted")
+    assert d["authority"] == "ask"
+    assert d["mode"] == "you"
+    assert d["tier"] != TIER_ACT
+
+
+# --- never rungs ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "how does the mix sound",
+        "does the 808 sound better now",
+        "give it a listen and tell me",
+        "did you hear that",
+    ],
+)
+def test_claiming_ears_is_refused(action):
+    """This layer has no ears. No tier below 3 may pretend otherwise."""
+    assert decide(action)["tier"] == TIER_REFUSE
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "rebuild defaults in control surfaces",
+        "route MELEGI audio through the bus",
+        "mark MCU echo as verified",
+        "just assume the tempo is 92",
+        "use the AX readback to confirm the region",
+    ],
+)
+def test_protected_surfaces_are_refused(action):
+    assert decide(action)["tier"] == TIER_REFUSE
+
+
+def test_refusal_never_downgrades_by_wording():
+    """A refusal phrased as a read is still a refusal: order is authority order."""
+    assert decide("check how the guitar sounds")["tier"] == TIER_REFUSE
+
+
+# --- rollback invariant --------------------------------------------------
+
+
+def test_every_propose_rule_states_a_rollback():
+    """Tier 1 is 'reversible'. A rung without an undo is a lie about the tier."""
+    missing = [r.pattern.pattern for r in RULES if r.tier == TIER_PROPOSE and not r.rollback]
+    assert not missing, missing
+
+
+def test_propose_without_rollback_is_downgraded(monkeypatch):
+    rule = classify("set the fader to -6 dB")
+    assert rule is not None and rule.tier == TIER_PROPOSE
+    monkeypatch.setattr(rule, "rollback", None)
+    d = decide("set the fader to -6 dB")
+    assert d["tier"] == TIER_ASK
+    assert d["downgraded"]
+
+
+def test_acts_are_reversible_and_touch_no_session():
+    for action in ("read the envelope", "park this idea", "run the tests"):
+        assert decide(action)["tier"] == TIER_ACT
+        assert decide(action)["mode"] == "for"
+
+
+# --- one voice, one action ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["set track 3 to -6 dB", "master this to -9 LUFS", "park the intro idea", "did you hear that"],
+)
+def test_spoken_line_is_at_most_two_sentences(action):
+    line = persona.line(decide(action))
+    assert line.count(".") <= 3, line  # two sentences plus a decimal or abbreviation
+    assert len(line) < 240, line
+
+
+def test_spoken_line_never_claims_a_listen():
+    for action in ("how does the mix sound", "give it a listen"):
+        line = persona.line(decide(action)).lower()
+        assert "sounds good" not in line
+        assert line.startswith("no.")
+
+
+def test_plain_keeps_underscored_filenames_readable():
+    assert persona.plain("see `MCP_CAPABILITIES.md`") == "see MCP_CAPABILITIES.md"
+
+
+# --- grounding: never invent state --------------------------------------
+
+
+def test_snapshot_denies_ears_and_project_reads():
+    snap = state.snapshot()
+    assert snap["can_hear_audio"] is False
+    assert snap["can_read_logic_project"] is False
+
+
+def test_snapshot_is_grounded_in_real_files(repo_root):
+    snap = state.snapshot()
+    for rel in snap["grounded_in"]:
+        assert (repo_root / rel).is_file(), rel
+
+
+def test_missing_studio_notes_yield_nothing_not_fiction(monkeypatch, tmp_path):
+    monkeypatch.setattr(state, "PROJECT_STATE", tmp_path / "gone.md")
+    monkeypatch.setattr(state, "CURRENT_TASKS", tmp_path / "also-gone.md")
+    snap = state.snapshot()
+    assert snap["now"] is None
+    assert snap["blockers"] == []
+    assert snap["unknown"], "a gnome with no notes must say so"
+
+
+# --- mouth: honest degradation ------------------------------------------
+
+
+def test_mute_is_reported_not_faked(monkeypatch):
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    said = mouth.speak("MCU echo is the pass bit")
+    assert said["spoke"] is False
+    assert mouth.MUTE_ENV in said["reason"]
+
+
+def test_no_say_binary_means_not_spoken(monkeypatch):
+    monkeypatch.delenv(mouth.MUTE_ENV, raising=False)
+    monkeypatch.setattr(mouth.shutil, "which", lambda _name: None)
+    ok, why = mouth.available()
+    assert ok is False
+    assert "macOS" in why
+    assert mouth.speak("anything")["spoke"] is False
+
+
+# --- ledger --------------------------------------------------------------
+
+
+def test_ledger_roundtrip(tmp_path):
+    path = tmp_path / "decisions.jsonl"
+    written, where = ledger.append({"action": "a", "mode": "for"}, path=path)
+    assert written and where == str(path)
+    ledger.append({"action": "b", "mode": "you"}, path=path)
+    rows = ledger.read(10, path=path)
+    assert [r["action"] for r in rows] == ["a", "b"]
+
+
+def test_ledger_write_failure_is_reported(tmp_path):
+    blocked = tmp_path / "file.txt"
+    blocked.write_text("not a directory")
+    written, why = ledger.append({"action": "a"}, path=blocked / "nested.jsonl")
+    assert written is False
+    assert "failed" in why
+
+
+# --- CLI -----------------------------------------------------------------
+
+
+def _run(capsys, argv):
+    assert gnomo_main(argv) == 0
+    return capsys.readouterr().out
+
+
+def test_cli_decide_json_shape(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "decisions.jsonl")
+    payload = json.loads(_run(capsys, ["--json", "decide", "play the transport"]))
+    for key in ("companion", "timestamp", "tier", "authority", "mode", "spoken", "voice"):
+        assert key in payload, key
+    assert payload["companion"] == "GNOMO"
+    assert payload["voice"]["spoke"] is False
+
+
+def test_cli_next_names_one_thing(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "decisions.jsonl")
+    out = _run(capsys, ["next"])
+    assert "GNOMO" in out
+    assert "One thing:" in out or "one thing" in out.lower()
+
+
+def test_cli_park_writes_and_stamps(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    monkeypatch.setattr(state, "PARKING_LOT", tmp_path / "PARKING_LOT.md")
+    monkeypatch.setattr(state, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "decisions.jsonl")
+    payload = json.loads(_run(capsys, ["--json", "park", "chop the intro tighter"]))
+    assert payload["parked"] is True
+    assert payload["timestamp"]
+    assert "chop the intro tighter" in (tmp_path / "PARKING_LOT.md").read_text()
+
+
+def test_cli_empty_ask_exits_nonzero_without_traceback(capsys, monkeypatch):
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    assert gnomo_main(["decide", "   "]) == 2
+    assert "GNOMO:" in capsys.readouterr().err
