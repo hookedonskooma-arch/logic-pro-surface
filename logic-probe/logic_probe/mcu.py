@@ -38,6 +38,10 @@ FADER_POS_0DB = 0.75
 FADER_DB_MAX = 6.0
 FADER_DB_FLOOR = -144.0
 
+# How far to move the fader when disambiguating a silent send. Must be well
+# outside FADER_ECHO_COUNTS so the nudge cannot be mistaken for the target.
+NUDGE_COUNTS = 2000
+
 # Echo match: 14-bit counts (~1.6% of throw) or dB. Either is enough.
 FADER_ECHO_COUNTS = 256
 FADER_ECHO_DB = 1.5
@@ -157,6 +161,15 @@ def _raw_of(msg: Any) -> list[int]:
     return []
 
 
+def _move_fader(send, strip: int, value14: int) -> None:
+    """Touch, move, release — the gesture Logic expects from a real surface."""
+    send([0x90, FADER_TOUCH_BASE + strip, 127])
+    time.sleep(0.02)
+    send(fader_pitchbend_bytes(strip, value14))
+    time.sleep(0.02)
+    send([0x80, FADER_TOUCH_BASE + strip, 0])
+
+
 def run_set_volume(
     *,
     send,
@@ -208,16 +221,39 @@ def run_set_volume(
     strip = strip_for_track(track)
     sent14 = db_to_fader14(db)
 
-    send([0x90, FADER_TOUCH_BASE + strip, 127])
-    time.sleep(0.02)
-    send(fader_pitchbend_bytes(strip, sent14))
-    time.sleep(0.02)
-    send([0x80, FADER_TOUCH_BASE + strip, 0])
+    _move_fader(send, strip, sent14)
     drain(echo_s)
 
     echo14: int | None = state.fader[strip] if state.saw_mcu else None
     matched = echo_matches(sent14, echo14, db) and state.saw_mcu
+
+    # Logic only echoes a fader position when the value actually CHANGES.
+    # Re-sending the value a strip already holds produces no echo, which is
+    # indistinguishable from a dead surface unless we disambiguate. Nudge to a
+    # clearly different value: if that echoes, the surface is alive and the
+    # first send was a no-op, so re-sending the target is now a real change and
+    # will echo. If the nudge is silent too, the surface really is not talking.
+    nudged = False
+    if not matched:
+        nudge14 = clamp_fader14(sent14 - NUDGE_COUNTS if sent14 > FADER_14_MAX // 2
+                                else sent14 + NUDGE_COUNTS)
+        if nudge14 != sent14:
+            nudged = True
+            notes.append(f"no echo on first send; disambiguating with nudge to {nudge14}")
+            _move_fader(send, strip, nudge14)
+            drain(echo_s)
+            nudge_echo = state.fader[strip] if state.saw_mcu else None
+            if echo_matches(nudge14, nudge_echo, fader14_to_db(nudge14)):
+                notes.append("nudge echoed: surface is live, first send was a no-op")
+                _move_fader(send, strip, sent14)
+                drain(echo_s)
+                echo14 = state.fader[strip] if state.saw_mcu else None
+                matched = echo_matches(sent14, echo14, db) and state.saw_mcu
+            else:
+                notes.append("nudge did not echo either: surface is not sending fader feedback")
+
     return {
+        "nudged": nudged,
         "strip": strip,
         "sent14": sent14,
         "sent_db_law": fader14_to_db(sent14),

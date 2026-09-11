@@ -101,7 +101,10 @@ def _check_echo() -> dict[str, Any]:
     from logic_probe import channels
 
     try:
-        env = channels.mixer_set_volume(3, -6.0)
+        # Track 1, not 3: the documented fixture is one clean project, which may
+        # hold a single track. An empty strip never echoes, so probing a strip
+        # that may not exist turns a wiring check into a project-content check.
+        env = channels.mixer_set_volume(1, -6.0)
     except Exception as exc:  # noqa: BLE001 — fail closed into the step
         return {"state": UNKNOWN, "evidence": f"probe_failed:{exc}", "channel": "mcu"}
     status = env.get("status")
