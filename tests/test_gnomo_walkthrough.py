@@ -8,6 +8,7 @@ a broken check fails closed, and only an MCU echo closes step 5.
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -15,8 +16,23 @@ from gnomo import ledger, mouth, walkthrough
 from gnomo.cli import main as gnomo_main
 
 
-def test_no_step_claims_done_without_a_mac():
-    """On this Linux host nothing is set up, so nothing may report done."""
+def test_no_step_claims_done_without_evidence():
+    """A step may only report done if its check actually produced evidence.
+
+    This used to assert that NOTHING was ever done, which only held on a bare
+    Linux CI box. On a real set-up Mac `iac` and `echo` are legitimately done,
+    and the test failed for being right. The honesty boundary being pinned is
+    not "nothing passes" — it is "nothing passes unverified".
+    """
+    for row in walkthrough.evaluate():
+        assert row["state"] in (walkthrough.TODO, walkthrough.DONE, walkthrough.UNKNOWN), row
+        if row["state"] == walkthrough.DONE:
+            assert row["evidence"], f"{row['step']} claims done with no evidence"
+
+
+@pytest.mark.skipif(sys.platform == "darwin", reason="a Mac may genuinely be set up")
+def test_nothing_is_done_without_a_mac():
+    """Off macOS none of this can be set up, so nothing may report done."""
     for row in walkthrough.evaluate():
         assert row["state"] in (walkthrough.TODO, walkthrough.UNKNOWN), row
 
@@ -102,6 +118,10 @@ def test_cli_setup_names_one_step(capsys, monkeypatch, tmp_path):
     monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "decisions.jsonl")
     assert gnomo_main(["--json", "setup", "mcu"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["current_step"] == "iac"
+    # The named step is whichever one is next, not a fixed id: on a set-up Mac
+    # the early steps are already done and "iac" is no longer current.
+    rows = walkthrough.evaluate()
+    expected = next((r["step"] for r in rows if r["state"] != walkthrough.DONE), None)
+    assert payload["current_step"] == expected
     assert len(payload["steps"]) == len(walkthrough.STEPS)
     assert payload["tier"] == 0, "checking setup is read-only; it acts for you"

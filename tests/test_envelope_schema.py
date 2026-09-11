@@ -13,7 +13,15 @@ from logic_probe.envelope import EnvelopeError, SEMANTIC_STATUSES, build_envelop
 from logic_probe.channels import ax_inspect_selected_track, mixer_set_volume, transport_play
 
 REPO = Path(__file__).resolve().parents[1]
-PROBE_ENV = {**dict(**__import__("os").environ), "PYTHONPATH": str(REPO / "logic-probe")}
+# These tests assert the OFFLINE contract (never `confirmed` without Logic).
+# Force it rather than depending on whether this machine happens to have Logic
+# running: on a live rig the probe rightly returns `confirmed` and the offline
+# assertions fail for the wrong reason.
+PROBE_ENV = {
+    **dict(**__import__("os").environ),
+    "PYTHONPATH": str(REPO / "logic-probe"),
+    "LOGIC_PROBE_FORCE_OFFLINE": "1",
+}
 
 
 REQUIRED_KEYS = ("before", "adapter_result", "readback", "verification", "status")
@@ -104,7 +112,8 @@ def _keys_ok(env: dict):
     assert env["status"] != "confirmed"
 
 
-def test_v0_channels_are_uncertain():
+def test_v0_channels_are_uncertain(monkeypatch):
+    monkeypatch.setenv("LOGIC_PROBE_FORCE_OFFLINE", "1")
     _keys_ok(mixer_set_volume(3, -6.0))
     _keys_ok(transport_play())
     ax = ax_inspect_selected_track()
