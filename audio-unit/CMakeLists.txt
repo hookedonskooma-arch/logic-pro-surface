@@ -28,6 +28,15 @@ if(APPLE)
         ${CMAKE_CURRENT_SOURCE_DIR}/cpp-dsp
         ${CMAKE_CURRENT_SOURCE_DIR}/objcxx
     )
+    # KernelAdapter.mm is written ARC-style; without this the render block is
+    # returned from the stack and clang rejects it under manual retain-release.
+    set_source_files_properties(objcxx/KernelAdapter.mm PROPERTIES
+        COMPILE_OPTIONS "-fobjc-arc"
+    )
+    target_link_libraries(LogicSurfaceMidiFx PRIVATE
+        "-framework Foundation"
+        "-framework AudioToolbox"
+    )
     set_target_properties(LogicSurfaceMidiFx PROPERTIES
         BUNDLE TRUE
         BUNDLE_EXTENSION component
