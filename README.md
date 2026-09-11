@@ -26,7 +26,7 @@ We never collapse these into "supported":
 ## What ships first
 
 1. Surface map (this repo).
-2. AU MIDI FX brick (extracted from MELEGI).
+2. AU MIDI FX brick (`audio-unit/`, Apple-shaped stub).
 3. Ten fail-closed evals that score musical truth, not AX receipts.
 4. MCP adapter last.
 
@@ -38,7 +38,7 @@ Logic's native third-party plugin path is Audio Units, not VST.
 
 **Not tonight:** live TESTED results against Logic Pro. This drop does **not** invent them.
 
-**Needs macOS + Logic Pro 12.3 (desktop, one clean empty project):** E01–E07 and E10 musical truth, `nm` / pluginval on a real `.component` for E08, a render-thread allocator hook for E09, live E02 against the extracted MELEGI AU MIDI FX (see [docs/MELEGI-EXTRACTION.md](docs/MELEGI-EXTRACTION.md)), virtual MCU, then MCP last.
+**Needs macOS + Logic Pro 12.3 (desktop, one clean empty project):** E01–E07 and E10 musical truth, `nm` / pluginval on a real `.component` for E08, a render-thread allocator hook for E09, live E02 against the AU MIDI FX stub in `audio-unit/`, virtual MCU, then MCP last.
 
 A green Linux CI run is not TESTED against Logic. Skip is not pass. AX receipts cannot be the pass bit.
 
@@ -88,7 +88,6 @@ Live-Logic tests (`pytest -m live_logic`) fail closed when Logic is absent. They
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — AU / MIDI / control-surface first, MCP last.
 - [docs/CAPABILITY_MATRIX.md](docs/CAPABILITY_MATRIX.md) — every row has a status tag.
 - `audio-unit/` — Apple-shaped MIDI FX stub (4-note phrase C3 E3 G3 C4).
-- `audio-unit/melegi/` — extracted MELEGI JUCE AU MIDI FX only. Not TTS, not audio pass-through, not Ollama. See [docs/MELEGI-EXTRACTION.md](docs/MELEGI-EXTRACTION.md).
 - `logic-probe/` — Python harness.
 - `grok/` — bot prompts (engineer + companion), source policy, promotion gates.
 - `logic-probe/gnomo/` — GNOMO companion: decision ladder, voice, grounding, ledger.

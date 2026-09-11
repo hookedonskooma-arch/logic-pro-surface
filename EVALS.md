@@ -7,7 +7,7 @@ Host: macOS, Logic Pro 12.3 desktop, one clean empty project. Fail closed on UNK
 | ID | Surface | Pass condition | Forbidden evidence |
 | --- | --- | --- | --- |
 | E01 | CoreMIDI → software instrument | Send NoteOn C3 / NoteOff. A MIDI region or live input monitor shows that note at that time. | AX "key highlighted" |
-| E02 | AU MIDI FX out | MELEGI (or successor) AU on a MIDI FX slot emits a known 4-note phrase to the instrument below. Phrase hash matches fixture. | Plugin window opened |
+| E02 | AU MIDI FX out | The `audio-unit/` AU stub on a MIDI FX slot emits a known 4-note phrase to the instrument below. Phrase hash matches fixture. | Plugin window opened |
 | E03 | Scripter JS | `HandleMIDI` transposes +12. Incoming C3 becomes C4 on the instrument track. | Script editor console text |
 | E04 | Scripter is not a project API | Script cannot rename the project or create a track. Attempt must fail. | |
 | E05 | Virtual MCU transport | Play / stop via Mackie Control. Transport is playing, then stopped, via MCU echo or CoreMIDI MMC, not AX. | Clicking the play button |

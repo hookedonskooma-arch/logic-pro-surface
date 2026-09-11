@@ -24,7 +24,7 @@ E06 is TESTED only on `status=confirmed` with `readback.method=mcu_feedback`.
 
 ## LATER
 
-- Live E02 against extracted MELEGI AU MIDI FX (`audio-unit/melegi/`). Not TTS, not Ollama.
+- Live E02 against the AU MIDI FX stub (`audio-unit/`). Not TTS, not Ollama.
 - E01–E10 live against Logic
 
 ## DO NOT TOUCH

@@ -9,14 +9,13 @@ One page. Not a claim that the bridge works.
 - MIT license, contributing rules, architecture, capability matrix, honest contract.
 - `logic-probe` CLI. Without Logic: `status=uncertain`. Never fakes `confirmed`.
 - AU MIDI Processor **stub** (Swift `AUAudioUnit` → Objective-C++ adapter → C++ kernel). Phrase C3 E3 G3 C4 is coded, not live-tested.
-- MELEGI JUCE AU MIDI FX extract in `audio-unit/melegi/` (AU only, MIDI effect, not TTS, not Ollama). Live Logic E02 still UNKNOWN.
 - Linux-safe fail-closed tests: envelope schema, E04 (Scripter is not a project API), E08 (no VST format), E09 (render-path scan).
 - GitHub Actions: those tests only.
 - Grok bot files: system prompt, source policy, promotion gates.
 
 ## Not in this drop
 
-- The MELEGI **app** stack (Ollama, band, backend, ui control room, voz-bridge Node, songs). AU MIDI FX sources now live in `audio-unit/melegi/`. See [docs/MELEGI-EXTRACTION.md](docs/MELEGI-EXTRACTION.md).
+- The MELEGI **app** stack (Ollama, band, backend, ui control room, voz-bridge Node, songs) and its JUCE AU sources. This repo is the surface and the companion; MELEGI lives in its own repo.
 - Ollama, band stack, backend, ai-stack, vibe-producer, beatstore.
 - Any live Logic TESTED numbers. None were run for this v0.
 - MCP server. MCP is last.
@@ -25,7 +24,6 @@ One page. Not a claim that the bridge works.
 
 | When | What | Status until then |
 | --- | --- | --- |
-| Extract | AU MIDI FX only from MELEGI. `FORMATS AU`, `IS_MIDI_EFFECT TRUE`, not a synth. Not TTS, not Ollama. | sources in `audio-unit/melegi/`; live E02 UNKNOWN |
 | E01 | CoreMIDI note on a software instrument | UNKNOWN |
 | E02 | AU MIDI FX 4-note phrase hash | UNKNOWN |
 | E03 | Scripter JS +12 transpose | UNKNOWN |

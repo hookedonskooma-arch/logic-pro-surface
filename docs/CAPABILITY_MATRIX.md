@@ -19,7 +19,7 @@ Target host for later live rows: macOS, Logic Pro 12.3.
 | Custom MDS button → key command | Lua MDS | none | E07 (e.g. record) | UNKNOWN | — | — | E07. |
 | Control surface hosting | Logic CSS | none | Setup window | VERIFIED | — | 12.x (Apple) | Hardware/firmware MCU. |
 | Virtual MCU transport play/stop | MCU over CoreMIDI | CGEvent | MCU echo or MMC, not AX | EXPERIMENTAL | — | — | Community TESTED. Ours: E05 UNKNOWN. |
-| MCU fader write + echo | MCU | AX (forbidden as pass) | MCU echo within tolerance | EXPERIMENTAL | 2026-09-01 (studio Mac, envelope) | 12.x | Implementation in `logic_probe`. E06 TESTED only on `confirmed` + `mcu_feedback`. IAC cmd/fb buses created; Logic Setup assignment is the remaining blocker if echo is absent. MELEGI not used. |
+| MCU fader write + echo | MCU | AX (forbidden as pass) | MCU echo within tolerance | TESTED | 2026-09-11 (studio Mac, Logic 12.2, live echo) | 12.2 | Implementation in `logic_probe`. E06 returns `confirmed` + `mcu_feedback`, echo within ~0.03 dB, repeatable. Mackie Control assigned: Logic INPUT `logic-probe-mcu-cmd`, OUTPUT `logic-probe-mcu-fb`. Logic echoes only on CHANGE, so a no-op send is disambiguated by a nudge. TESTED, not VERIFIED: MCU bytes are not an Apple spec. MELEGI not used. |
 | CoreMIDI virtual endpoints | CoreMIDI | IAC | MIDI monitor | VERIFIED (API) | — | macOS | Agent use in Logic: E01 UNKNOWN. |
 | NoteOn C3 to software instrument | CoreMIDI | IAC | region or input monitor | UNKNOWN | — | — | E01. AX "key highlighted" forbidden. |
 | Apple OSC paths | Logic OSC (UDP/IPv4) | none | Logic OSC monitor | VERIFIED (path set) | — | 12.x (Apple) | Invented `/track/N/volume` is not Apple OSC. |
