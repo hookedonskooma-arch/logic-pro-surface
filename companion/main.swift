@@ -180,10 +180,13 @@ class DragView: NSView {
     var onDragMove: ((NSPoint) -> Void)?
     var onDragEnd: (() -> Void)?
     var onDragDelta: ((CGFloat) -> Void)?
+    var onClick: ((NSPoint) -> Void)?
     private var lastX: CGFloat = 0
+    private var downPoint: NSPoint = .zero
 
     override func mouseDown(with event: NSEvent) {
         window?.makeKey()
+        downPoint = NSEvent.mouseLocation
         lastX = NSEvent.mouseLocation.x
         onDragStart?(NSEvent.mouseLocation)
     }
@@ -196,6 +199,10 @@ class DragView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        let moved = hypot(NSEvent.mouseLocation.x - downPoint.x, NSEvent.mouseLocation.y - downPoint.y)
+        if moved < 4 {
+            onClick?(NSEvent.mouseLocation)
+        }
         onDragEnd?()
     }
 }
@@ -825,6 +832,7 @@ final class GnomoPanel: NSPanel {
         root.onDragMove = { [weak self] p in self?.windowDragged(to: p) }
         root.onDragDelta = { [weak self] dx in self?.life?.dragTilt(velocityX: dx * 60) }
         root.onDragEnd = { [weak self] in self?.life?.setDragging(false) }
+        root.onClick = { [weak self] _ in self?.gnomeClicked() }
 
         gnome.imageScaling = .scaleProportionallyUpOrDown
         gnome.image = NSImage(contentsOf: URL(fileURLWithPath: Gnomo.assetsDir + "/gnome-face.png"))
@@ -960,8 +968,58 @@ final class GnomoPanel: NSPanel {
         buildLife()
     }
 
+    // MARK: minimize — "in and out"
+
+    /// Minimized: only the gnome sprite, shrunken, tucked into the nearest
+    /// corner. The bubble/input/badge collapse; ears close. One click on the
+    /// sprite (or menu → Peek) springs him back.
+    private var minimized = false
+    private var preMinimizeSpot: NSPoint = .zero
+
+    func toggleMinimized() {
+        minimized.toggle()
+        if minimized {
+            preMinimizeSpot = uiBottomCenter
+            // tuck into the nearest corner, tiny
+            let v = NSScreen.main?.visibleFrame ?? .zero
+            let cornerX = preMinimizeSpot.x < v.midX ? v.minX + 90 : v.maxX - 90
+            bubble.isHidden = true
+            input.isHidden = true
+            micButton.isHidden = true
+            badge.stringValue = "zzz"
+            placeUIColumn(bottomCenter: NSPoint(x: cornerX, y: v.minY + 64))
+            gnomeHeight?.constant = 110
+            uiColumn.needsLayout = true
+            animator?.vanish(seconds: 0.3)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) { [weak self] in
+                self?.animator?.appear()
+                self?.badge.stringValue = "GNOMO · zzz"
+                self?.badge.textColor = .secondaryLabelColor
+            }
+            ears?.stop()
+            micButton.title = "🎙"
+        } else {
+            bubble.isHidden = false
+            input.isHidden = false
+            micButton.isHidden = false
+            gnomeHeight?.constant = baseGnomeHeight * zoomScale
+            placeUIColumn(bottomCenter: preMinimizeSpot)
+            uiColumn.needsLayout = true
+            animator?.vanish(seconds: 0.2)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+                self?.animator?.appear()
+                self?.badge.stringValue = "GNOMO · here"
+                self?.badge.textColor = .secondaryLabelColor
+            }
+        }
+    }
+
+    /// Click the sprite while minimized → spring back.
+    private func gnomeClicked() {
+        if minimized { toggleMinimized() }
+    }
+
     private func windowDragged(to screenPoint: NSPoint) {
-        // Drag moves the UI column across the fullscreen stage, clamped on-screen.
         let dx = screenPoint.x - dragAnchor.x
         let dy = screenPoint.y - dragAnchor.y
         dragAnchor = screenPoint
@@ -1487,6 +1545,10 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
+        let peek = NSMenuItem(title: "Peek / Hide the gnome", action: #selector(toggleMinimized), keyEquivalent: "h")
+        peek.target = self
+        menu.addItem(peek)
+
         let next = NSMenuItem(title: "The one thing", action: #selector(runNext), keyEquivalent: "n")
         next.target = self
         menu.addItem(next)
@@ -1509,6 +1571,12 @@ final class StatusMenu: NSObject, NSMenuDelegate {
         menu.addItem(quit)
 
         item.menu = menu
+    }
+
+    /// Minimize: the gnome collapses into a tiny corner sprite (just him,
+    /// no bubble/input/badge — "out"). Peek: he springs back ("in").
+    @objc private func toggleMinimized() {
+        panel?.toggleMinimized()
     }
 
     @objc private func runNext() {
