@@ -966,12 +966,14 @@ final class GnomoPanel: NSPanel {
             micButton.title = "🎙"
             badge.stringValue = "ears closed"
             badge.textColor = .secondaryLabelColor
+            setListeningFace(false)
         } else {
             ears.start()
             micButton.title = "🔴"
             badge.stringValue = "listening…"
             badge.textColor = NSColor.systemRed
             animator?.listening()
+            setListeningFace(true)
         }
     }
 
@@ -1055,6 +1057,35 @@ final class GnomoPanel: NSPanel {
             badge.stringValue = tierLabels[tier] ?? "T\(tier)"
             badge.textColor = tierColors[tier] ?? NSColor.systemOrange
             animator?.react(to: d)
+            // Expression swap: the face matches the ladder rung.
+            setFace(forTier: tier)
+        }
+    }
+
+    /// Face per ladder rung, from the mockup character set:
+    ///   T0 act -> happy · T1 propose -> thinking · T2 ask -> confused
+    ///   T3 never -> error · listening -> emote-listening · failure -> error
+    private func setFace(forTier tier: Int) {
+        setFaceImage("mockup/\(faceName(forTier: tier)).png")
+    }
+
+    private func faceName(forTier tier: Int) -> String {
+        switch tier {
+        case 0: return "gnomo-happy"
+        case 1: return "gnomo-thinking"
+        case 2: return "gnomo-confused"
+        default: return "gnomo-error"
+        }
+    }
+
+    private func setListeningFace(_ listening: Bool) {
+        setFaceImage(listening ? "mockup/emote-listening.png" : "mockup/gnomo-idle.png")
+    }
+
+    private func setFaceImage(_ relPath: String) {
+        let path = Gnomo.assetsDir + "/" + relPath
+        if let img = NSImage(contentsOf: URL(fileURLWithPath: path)) {
+            gnome.image = img
         }
     }
 
@@ -1168,12 +1199,13 @@ final class GnomoPanel: NSPanel {
         })
     }
 
-    /// Zoom: scale the gnome up in place — the window grows around him,
-    /// feet planted, bubble stays readable.
+    /// Zoom: scale the gnome toward screen takeover. The window is a
+    /// fullscreen transparent stage; the UI block floats inside it, so
+    /// "bigger" = grow the gnome + re-anchor the block (window never resizes).
     private func zoom(_ arg: String) {
         switch arg {
         case "in":
-            zoomScale = zoomedIn
+            zoomScale = zoomScale >= zoomMax - 0.01 ? 1.0 : min(zoomMax, max(zoomedIn, zoomScale * 1.6))
         case "out", "normal":
             zoomScale = 1.0
         default: // toggle
@@ -1183,31 +1215,34 @@ final class GnomoPanel: NSPanel {
     }
 
     private func applyZoom(animated: Bool) {
-        guard let constraint = gnomeHeight else { return }
+        guard let constraint = gnomeHeight, let root = contentView else { return }
+        let newHeight = baseGnomeHeight * zoomScale
 
-        // Feet stay planted: keep the window's bottom-center fixed.
-        let oldFrame = frame
-        let anchorX = oldFrame.midX
+        // Feet planted: the window's BOTTOM stays put, the top grows upward.
+        constraint.constant = newHeight
+        root.layoutSubtreeIfNeeded()
 
-        constraint.constant = baseGnomeHeight * zoomScale
-        guard let root = contentView, let fit = windowLayoutSize() else { return }
-        _ = root
-
-        var newFrame = oldFrame
-        newFrame.size = fit
-        newFrame.origin.x = anchorX - fit.width / 2
-        newFrame.origin.y = oldFrame.minY
-
+        var fit = root.fittingSize
+        fit.width = max(260, fit.width)
+        var f = frame
+        f.origin.y = f.maxY - fit.height          // bottom fixed (flip coords: minY is bottom)
+        f.size = fit
+        // clamp on-screen
+        if let screen = NSScreen.main {
+            let v = screen.visibleFrame
+            f.origin.y = max(v.minY, min(f.origin.y, screen.frame.maxY - f.height))
+        }
         let apply = {
-            constraint.constant = self.baseGnomeHeight * self.zoomScale
-            self.setFrame(newFrame, display: true)
-            self.contentView?.needsLayout = true
+            constraint.constant = newHeight
+            self.setFrame(f, display: true)
+            root.layoutSubtreeIfNeeded()
         }
 
         if animated {
             NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = 0.45
                 ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                ctx.allowsImplicitAnimation = true
                 apply()
             }, completionHandler: nil)
         } else {
