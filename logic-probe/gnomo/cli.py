@@ -16,6 +16,9 @@ from typing import Any
 
 from . import ledger, mouth, persona, state, walkthrough
 from .ladder import TIER_ACT, TIER_REFUSE, decide
+from .music_plan import MusicPlanError, load_plan, plan_from_json
+from .midi_compiler import compile_plan, write_smf
+from .seam import SeamError, play_plan
 
 EXIT_OK = 0
 
@@ -133,6 +136,129 @@ def cmd_park(args: argparse.Namespace) -> int:
     }
     spoken = "Parked. Back to the one thing." if ok else f"Could not park it: {where}"
     return _emit(payload, spoken, as_json=args.json, quiet=args.quiet)
+
+
+def cmd_plan(args: argparse.Namespace) -> int:
+    """Tier 0: validate + compile a MusicPlan. No Logic, no ports, no send."""
+    try:
+        plan = load_plan(args.file) if args.file else plan_from_json(args.json_text)
+        compiled = compile_plan(plan)
+    except MusicPlanError as exc:
+        payload = {
+            "companion": "GNOMO",
+            "command": "plan",
+            "hat": args.hat,
+            "tier": 0,
+            "authority": "act",
+            "mode": "for",
+            "action": "validate + compile a music plan",
+            "accepted": False,
+            "error": str(exc),
+        }
+        return _emit(payload, f"Plan rejected: {exc}", as_json=args.json, quiet=args.quiet)
+
+    out_path = None
+    if args.out:
+        out_path = write_smf(compiled, args.out)
+    payload = {
+        "companion": "GNOMO",
+        "command": "plan",
+        "hat": args.hat,
+        "tier": 0,
+        "authority": "act",
+        "mode": "for",
+        "action": "validate + compile a music plan",
+        "accepted": True,
+        "tempo": plan["tempo"],
+        "meter": plan["meter"],
+        "length_bars": plan["length_bars"],
+        "chords": plan["chords"],
+        "voicing": plan["voicing"],
+        "register": plan["register"],
+        "velocity_range": plan["velocity_range"],
+        "event_count": compiled["event_count"],
+        "phrase_hash": compiled["phrase_hash"],
+        "smf_bytes": len(compiled["smf"]),
+        "smf_path": out_path,
+    }
+    spoken = (
+        f"Plan compiles. {plan['length_bars']} bars at {plan['tempo']}, "
+        f"{compiled['event_count']} events, hash {compiled['phrase_hash']}."
+    )
+    return _emit(payload, spoken, as_json=args.json, quiet=args.quiet)
+
+
+def cmd_play(args: argparse.Namespace) -> int:
+    """Tier 1: play the compiled plan out CoreMIDI. Refuses without --go.
+
+    The gnome compiles for free; making sound in the room is with you.
+    Offline / missing ports land `uncertain` — the envelope says what is
+    missing, never a fake send.
+    """
+    if not args.go:
+        decision = decide(
+            "play the compiled plan out CoreMIDI",
+            hat=args.hat,
+            blockers=("no --go on the play command",),
+            grounded_in=("studio/FAILURE_DRIVEN_ARCHITECTURE.md",),
+        )
+        decision["command"] = "play"
+        return _emit(
+            decision,
+            "Say the word: rerun with --go and I will make sound.",
+            as_json=args.json,
+            quiet=args.quiet,
+        )
+
+    try:
+        plan = load_plan(args.file) if args.file else plan_from_json(args.json_text)
+        compiled = compile_plan(plan)
+    except MusicPlanError as exc:
+        payload = {
+            "companion": "GNOMO",
+            "command": "play",
+            "hat": args.hat,
+            "tier": 0,
+            "authority": "act",
+            "mode": "for",
+            "action": "compile the plan before playing",
+            "accepted": False,
+            "error": str(exc),
+        }
+        return _emit(payload, f"Plan rejected: {exc}", as_json=args.json, quiet=args.quiet)
+
+    envelope = play_plan(
+        compiled,
+        out_port=args.out,
+        capture_port=args.capture,
+        force_offline=args.offline,
+    )
+    spoken_by_status = {
+        "confirmed": (
+            f"Capture matches the compile. Hash {compiled['phrase_hash']} — "
+            "now your ears: does the instrument agree?"
+        ),
+        "failed": "Capture contradicts the compile. Something in the routing lies.",
+        "uncertain": f"Uncertain: {envelope['adapter_result'].get('reason')}. Nothing claimed.",
+    }
+    payload = {
+        "companion": "GNOMO",
+        "command": "play",
+        "hat": args.hat,
+        "tier": 1,
+        "authority": "propose",
+        "mode": "with",
+        "action": "play the compiled plan out CoreMIDI",
+        "phrase_hash": compiled["phrase_hash"],
+        "rollback": "stop the instrument track; nothing was written into the project",
+        "envelope": envelope,
+    }
+    return _emit(
+        payload,
+        spoken_by_status.get(envelope["status"], "Seam returned an unknown status."),
+        as_json=args.json,
+        quiet=args.quiet,
+    )
 
 
 def cmd_ledger(args: argparse.Namespace) -> int:
@@ -273,6 +399,36 @@ def _parser() -> argparse.ArgumentParser:
     led = sub.add_parser("ledger", help="recent decisions")
     led.add_argument("--limit", type=int, default=10)
     led.set_defaults(func=cmd_ledger)
+
+    plan_p = sub.add_parser(
+        "plan", help="validate + compile a MusicPlan (tier 0, no send)"
+    )
+    src = plan_p.add_mutually_exclusive_group(required=True)
+    src.add_argument("--file", help="path to a MusicPlan JSON file")
+    src.add_argument("--json-text", help="a MusicPlan as a JSON string")
+    plan_p.add_argument("--out", help="write the SMF to this path (drag-in ready)")
+    plan_p.set_defaults(func=cmd_plan)
+
+    play = sub.add_parser(
+        "play", help="play the compiled plan out CoreMIDI (tier 1, needs --go)"
+    )
+    psrc = play.add_mutually_exclusive_group(required=True)
+    psrc.add_argument("--file", help="path to a MusicPlan JSON file")
+    psrc.add_argument("--json-text", help="a MusicPlan as a JSON string")
+    play.add_argument("--out", required=True, help="CoreMIDI output port name")
+    play.add_argument(
+        "--capture",
+        help="independent CoreMIDI input port for the E12 capture (not the send port)",
+    )
+    play.add_argument(
+        "--go", action="store_true", help="give the nod: actually send the notes"
+    )
+    play.add_argument(
+        "--offline",
+        action="store_true",
+        help="force the offline contract (nothing opens, nothing sends)",
+    )
+    play.set_defaults(func=cmd_play)
 
     return p
 

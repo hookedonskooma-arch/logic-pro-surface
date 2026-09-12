@@ -27,6 +27,13 @@ Driver: `python3 scripts/speak.py "..."`.
 | bounce | bounce |
 | aumi | A U M I |
 
+## Candidates beyond v0
+
+Source-verified teardown of the options: [VOICE_TEARDOWN.md](VOICE_TEARDOWN.md).
+Short version: `say` stays the floor; Piper is archived upstream and its heir is
+GPL-3.0; Kokoro (Apache-2.0, weights included) is the only clean upgrade path;
+Pipecat is the wrong altitude for a two-sentence mouth. Nothing is TESTED.
+
 ## Never
 
 - Never claim MCP heard the mix.

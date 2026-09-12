@@ -1,0 +1,9 @@
+{
+  "tempo": 88,
+  "key": "D minor",
+  "length_bars": 8,
+  "chords": ["Dm9", "Bbmaj7", "Fadd9", "C", "Dm9", "Bbmaj7", "Gm9", "A7sus4"],
+  "voicing": "wide",
+  "register": "mid",
+  "velocity_range": [48, 76]
+}

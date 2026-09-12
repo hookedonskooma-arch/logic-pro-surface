@@ -95,6 +95,10 @@ commitment until Chris promotes it to [CURRENT_TASKS.md](CURRENT_TASKS.md).
 
 ## Use it
 
+The gnome has a face now: [companion/](../companion/) — the photo gnome,
+floating on the desktop, bubble and tier badge, type a decision at it. The
+window is a viewer over this same CLI; it owns no ladder and no mouth.
+
 ```bash
 export PYTHONPATH=logic-probe
 
@@ -161,3 +165,5 @@ Unchanged by this file, and not a to-do list:
 
 A companion that decides is not a companion that knows more. It knows exactly
 what it knew before, and now it is honest about who gets to act on it.
+
+Where the mouth goes next: [VOICE_TEARDOWN.md](VOICE_TEARDOWN.md).

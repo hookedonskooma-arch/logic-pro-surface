@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key><string>Gnomo</string>
+	<key>CFBundleDisplayName</key><string>Gnomo</string>
+	<key>CFBundleIdentifier</key><string>studio.gnomo.companion</string>
+	<key>CFBundleVersion</key><string>0.2.0</string>
+	<key>CFBundleShortVersionString</key><string>0.2.0</string>
+	<key>CFBundleExecutable</key><string>Gnomo</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>LSUIElement</key><true/>
+	<key>NSMicrophoneUsageDescription</key><string>Gnomo listens for studio commands so the desk companion can be driven hands-free.</string>
+	<key>NSSpeechRecognitionUsageDescription</key><string>Gnomo routes spoken studio commands through Apple speech recognition so they land like typed text. Audio is not stored by Gnomo.</string>
+</dict>
+</plist>
