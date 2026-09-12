@@ -171,8 +171,11 @@ def test_mute_is_reported_not_faked(monkeypatch):
 
 
 def test_no_say_binary_means_not_spoken(monkeypatch):
+    """The say-presence check lives in voz now; that is the single mouth."""
+    from voz import mouth as voz_mouth
+
     monkeypatch.delenv(mouth.MUTE_ENV, raising=False)
-    monkeypatch.setattr(mouth.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(voz_mouth.shutil, "which", lambda _name: None)
     ok, why = mouth.available()
     assert ok is False
     assert "macOS" in why

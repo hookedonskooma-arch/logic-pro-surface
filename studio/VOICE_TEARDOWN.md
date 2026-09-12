@@ -69,6 +69,15 @@ loses, provably, everything `scripts/speak.py` does:
 This is not a style disagreement. It is the six-voices problem regrown in
 code three days after Decision 004 cut it to one.
 
+**Status, 2026-09-12:** the structure that allowed it is fixed on the GNOMO
+branch. The implementation now lives in `logic-probe/voz/mouth.py`, imported by
+both `scripts/speak.py` and `gnomo.mouth`, and a test fails the build if any
+file outside `voz/` invokes `say`. That test scans `chatbot/` too, so **this
+branch's `MacSaySpeaker` will fail CI at merge until it imports `voz.mouth`** -
+a four-line deletion. The fix was not applied to `chatbot/voice.py` directly:
+that file is on another branch, and merging it is Chris's decision, not a
+cleanup to slip in.
+
 ### 1.2 Its neural path targets a dead upstream
 
 `PiperSpeaker` shells out to a `piper` binary. `rhasspy/piper` was

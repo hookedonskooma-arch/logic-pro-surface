@@ -10,6 +10,12 @@ macOS `say`. Voice: **Reed (English (US))**. If that voice is missing, **Samanth
 
 Fluency = Logic vocabulary in the spoken text, not a model that sings or hears.
 
+Implementation: `logic-probe/voz/mouth.py`. **One mouth, imported, never
+re-implemented.** `scripts/speak.py` is a thin CLI over it and `gnomo.mouth` is
+a thin companion wrapper. A test fails the build if any file outside `voz/`
+invokes `say` directly - because "one mouth" as a convention regrew a second
+one within three days (see [VOICE_TEARDOWN.md](VOICE_TEARDOWN.md) §1.1).
+
 Driver: `python3 scripts/speak.py "..."`.
 
 ## Pronounce

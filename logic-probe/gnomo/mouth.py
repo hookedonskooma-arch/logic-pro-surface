@@ -1,25 +1,19 @@
-"""The mouth. One mouth, reused, never re-implemented.
+"""GNOMO's mouth: a thin companion-level wrapper over the one mouth.
 
-Speech goes through scripts/speak.py (macOS `say`, Reed then Samantha, the
-Logic lexicon, the secret filter, the spoken.jsonl log). This module adds no
-second TTS path and no second lexicon.
+The lexicon, the secret filter, the Reed/Samantha preference and the spoken
+log all live in `voz.mouth`. This adds only what is companion-specific: the
+mute switch, and the result shape GNOMO's decision records expect.
 
-Off macOS the gnome does not pretend. `spoke` is False and the reason says
-why. Printed text is not speech, the same way a sent MIDI byte is not a
-confirmed fader.
+There is no second TTS path here and there must never be one. A test asserts
+that no file outside voz/ invokes `say`.
 """
 
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
-import sys
-from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SPEAK_SCRIPT = REPO_ROOT / "scripts" / "speak.py"
+from voz import mouth as _voz
 
 MUTE_ENV = "GNOMO_MUTE"
 
@@ -27,11 +21,7 @@ MUTE_ENV = "GNOMO_MUTE"
 def available() -> tuple[bool, str]:
     if os.environ.get(MUTE_ENV) == "1":
         return False, f"{MUTE_ENV}=1"
-    if not SPEAK_SCRIPT.is_file():
-        return False, "scripts/speak.py is missing"
-    if shutil.which("say") is None:
-        return False, "macOS `say` not on this host; the v0 mouth is macOS-only"
-    return True, "macOS say via scripts/speak.py"
+    return _voz.say_available()
 
 
 def speak(text: str, *, timeout: float = 30.0) -> dict[str, Any]:
@@ -44,25 +34,22 @@ def speak(text: str, *, timeout: float = 30.0) -> dict[str, Any]:
     if not ok:
         return {"spoke": False, "reason": why, "text": text, "channel": None}
 
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(SPEAK_SCRIPT), text],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"spoke": False, "reason": f"speak.py failed: {exc}", "text": text, "channel": None}
-
-    if proc.returncode != 0:
-        reason = (proc.stderr or "").strip() or f"speak.py returncode={proc.returncode}"
-        return {"spoke": False, "reason": reason, "text": text, "channel": None}
-
+    result = _voz.speak(text, timeout=timeout)
+    if not result.get("spoke"):
+        return {
+            "spoke": False,
+            "reason": result.get("reason", "unknown"),
+            "text": text,
+            "channel": None,
+        }
     return {
         "spoke": True,
-        "reason": why,
+        "reason": result.get("reason", "macOS say"),
         "text": text,
         "channel": "macos_say",
-        "evidence": (proc.stdout or "").strip().splitlines(),
+        "evidence": [
+            f"voice: {result.get('voice')}",
+            f"spoken: {result.get('spoken')}",
+            f"logged: {result.get('logged')}",
+        ],
     }
