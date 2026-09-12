@@ -47,7 +47,7 @@ struct Decision: Codable {
 
 enum Gnomo {
     /// Walk up from the executable until we find a dir holding
-    /// logic-probe/ and companion/assets/gnome@512.png. GNOMO_REPO wins.
+    /// logic-probe/ and companion/assets/gnome-face.png. GNOMO_REPO wins.
     static let repoRoot: String = {
         if let env = ProcessInfo.processInfo.environment["GNOMO_REPO"] {
             return env
@@ -58,7 +58,7 @@ enum Gnomo {
             let hasProbe = FileManager.default.fileExists(
                 atPath: candidate + "/logic-probe/gnomo/cli.py")
             let hasFace = FileManager.default.fileExists(
-                atPath: candidate + "/companion/assets/gnome@512.png")
+                atPath: candidate + "/companion/assets/gnome-face.png")
             if hasProbe && hasFace {
                 return candidate
             }
@@ -401,6 +401,30 @@ final class GnomeAnimator {
         layer.add(perk, forKey: "perk")
     }
 
+    /// Teleport vanish: shrink + fade to ghost in the given time.
+    func vanish(seconds: Double) {
+        guard let layer = view?.layer else { return }
+        let s = CAKeyframeAnimation(keyPath: "transform.scale")
+        s.values = [1.0, 1.08, 0.6, 0.0]
+        s.keyTimes = [0, 0.25, 0.7, 1]
+        s.duration = seconds
+        s.fillMode = .forwards
+        s.isRemovedOnCompletion = false
+        layer.add(s, forKey: "vanish")
+    }
+
+    /// Teleport appear: from ghost back to full, with a settle bounce.
+    func appear() {
+        guard let layer = view?.layer else { return }
+        let s = CAKeyframeAnimation(keyPath: "transform.scale")
+        s.values = [0.0, 1.15, 0.92, 1.0]
+        s.keyTimes = [0, 0.5, 0.75, 1]
+        s.duration = 0.5
+        s.isAdditive = false
+        layer.removeAnimation(forKey: "vanish")
+        layer.add(s, forKey: "appear")
+    }
+
     // MARK: tier gestures
 
     /// T0 — it acts: one small hop off the desk.
@@ -738,11 +762,13 @@ final class GnomoPanel: NSPanel {
     private var animator: GnomeAnimator?
     private var ears: Ears?
     private var pointOverlay: PointOverlay?
+    private var poofOverlay: PoofOverlay?
     private var gnomeHeight: NSLayoutConstraint?
     private var zoomScale: CGFloat = 1.0
 
     private let baseGnomeHeight: CGFloat = 250
-    private let zoomedIn: CGFloat = 1.6
+    private let zoomedIn: CGFloat = 2.4   // "bigger to the screen": real takeover size
+    private let zoomMax: CGFloat = 3.2    // full takeover ceiling
 
     private let tierLabels: [Int: String] = [
         0: "T0 · DOING IT — for you",
@@ -782,7 +808,7 @@ final class GnomoPanel: NSPanel {
         root.onDragMove = { [weak self] p in self?.windowDragged(to: p) }
 
         gnome.imageScaling = .scaleProportionallyUpOrDown
-        gnome.image = NSImage(contentsOf: URL(fileURLWithPath: Gnomo.assetsDir + "/gnome@512.png"))
+        gnome.image = NSImage(contentsOf: URL(fileURLWithPath: Gnomo.assetsDir + "/gnome-face.png"))
         gnome.translatesAutoresizingMaskIntoConstraints = false
 
         bubble.text = "One thing at a time. Click me or type below."
@@ -926,6 +952,10 @@ final class GnomoPanel: NSPanel {
             guard !path.isEmpty else { return ("reject", nil) }
             return ("plan", path)
         }
+        if lower.hasPrefix("poof") {
+            let target = String(raw.dropFirst(4)).trimmingCharacters(in: .whitespaces)
+            return ("poof", target.isEmpty ? "center" : target)
+        }
         return ("decide", raw)
     }
 
@@ -971,6 +1001,10 @@ final class GnomoPanel: NSPanel {
             return
         case "plan":
             planVerb(path: arg ?? "")
+            sender.stringValue = ""
+            return
+        case "poof":
+            teleport(to: arg ?? "center")
             sender.stringValue = ""
             return
         default:
@@ -1025,6 +1059,74 @@ final class GnomoPanel: NSPanel {
     }
 
     // MARK: body verbs — the window's own body, never ledgered
+
+    /// Teleport: vanish with a poof, appear at the designated spot with a poof.
+    /// No walking — the gnome materializes near the topic. The destination is
+    /// either a named area or the center of a pointed-at window.
+    private func teleport(to target: String) {
+        let oldCenter = NSPoint(x: frame.midX, y: frame.minY + 30)
+
+        // vanish: poof at the old spot, fade the gnome out
+        poofOverlay = poofOverlay ?? PoofOverlay()
+        poofOverlay?.poof(at: oldCenter)
+        animator?.vanish(seconds: 0.35)
+        badge.stringValue = "poof…"
+        badge.textColor = .secondaryLabelColor
+
+        let dest = designatedArea(for: target)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self else { return }
+            var f = self.frame
+            f.origin = dest
+            self.setFrame(f, display: false)
+            // appear: poof at the new spot, fade the gnome in, drop-in bounce
+            self.poofOverlay?.poof(at: NSPoint(x: f.midX, y: f.minY + 30))
+            self.animator?.appear()
+            self.badge.stringValue = "GNOMO · here"
+            self.badge.textColor = .secondaryLabelColor
+        }
+    }
+
+    /// Designated areas: gnome-sized spots tied to screen geography.
+    private func designatedArea(for target: String) -> NSPoint {
+        guard let screen = NSScreen.main else { return .zero }
+        let visible = screen.visibleFrame
+        let margin: CGFloat = 40
+        switch target {
+        case "left":
+            return NSPoint(x: visible.minX + margin, y: visible.minY + 30)
+        case "right":
+            return NSPoint(x: visible.maxX - frame.width - margin, y: visible.minY + 30)
+        case "center", "here":
+            return NSPoint(x: visible.midX - frame.width / 2, y: visible.minY + 30)
+        default:
+            // a topic word: teleport NEAR the window that matches it, lower-center
+            let words = target.lowercased()
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+            let candidates = ScreenFacts.otherWindows(excluding: ProcessInfo.processInfo.processIdentifier)
+            var best: (owner: String, frame: NSRect)? = nil
+            var bestScore = 0
+            for c in candidates {
+                var score = 0
+                for w in words {
+                    if c.owner.lowercased().contains(w) { score += 2 }
+                    if c.title.lowercased().contains(w) { score += 3 }
+                }
+                if score > bestScore { bestScore = score; best = (c.owner, c.frame) }
+            }
+            guard let hit = best else {
+                return NSPoint(x: visible.midX - frame.width / 2, y: visible.minY + 30)
+            }
+            // land beside the topic's window: near its lower-center, clamped on-screen
+            let x = max(visible.minX + margin,
+                        min(hit.frame.midX - frame.width / 2,
+                            visible.maxX - frame.width - margin))
+            let y = max(visible.minY + 30, hit.frame.minY - frame.height + 120)
+            bubble.text = "Poofed to \(hit.owner)."
+            return NSPoint(x: x, y: y)
+        }
+    }
 
     /// Walk: animate the panel across the bottom of the screen, waddling
     /// for the whole trip. "here" is the honest default: screen center.

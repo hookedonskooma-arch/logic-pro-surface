@@ -96,6 +96,10 @@ def route(typed: str) -> tuple[str, str | None]:
             return REJECT, None
         return "plan", path
 
+    if lower.startswith("poof"):
+        target = raw[4:].strip()
+        return "poof", target or "center"
+
     return "decide", raw
 
 
