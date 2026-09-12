@@ -152,6 +152,7 @@ def cmd_ledger(args: argparse.Namespace) -> int:
 
 def cmd_setup(args: argparse.Namespace) -> int:
     """One step at a time. The gnome does the IAC half; Logic's window needs hands."""
+    fixed: dict[str, Any] = {}
     if args.fix:
         try:
             from logic_probe import midi_io
@@ -159,23 +160,7 @@ def cmd_setup(args: argparse.Namespace) -> int:
             fixed = midi_io.ensure_iac_mcu_buses()
         except Exception as exc:  # noqa: BLE001 — report, never claim it worked
             fixed = {"attempted": True, "error": f"{type(exc).__name__}: {exc}"}
-        if fixed.get("error"):
-            payload = {
-                "companion": "GNOMO",
-                "command": "setup",
-                "hat": args.hat,
-                "tier": 2,
-                "authority": "ask",
-                "mode": "you",
-                "action": "create the IAC MCU buses",
-                "iac_fix": fixed,
-            }
-            return _emit(
-                payload,
-                f"Could not make the buses: {fixed['error']}.",
-                as_json=args.json,
-                quiet=args.quiet,
-            )
+    fix_failed = bool(args.fix and fixed.get("error"))
 
     results = walkthrough.evaluate()
     step = walkthrough.current(results)
@@ -203,13 +188,25 @@ def cmd_setup(args: argparse.Namespace) -> int:
         )
 
     spoken = step["spoken"]
+    if fix_failed:
+        spoken = "I could not make the buses myself. Do step one by hand."
     if not args.json:
         print(persona.hat_line(args.hat))
+        if fix_failed:
+            # A failed --fix is never a dead end: say what broke, then still
+            # give the step. "Error, no next action" is the one outcome this
+            # command must never produce.
+            print(f"I could not make the buses: {fixed['error']}")
+            print()
         done = sum(1 for r in results if r["state"] == walkthrough.DONE)
         print(f"step {done + 1} of {len(results)}: {step['title']}")
         print()
         for line in step["detail"]:
             print(f"  {line}")
+        if fix_failed and step["manual"]:
+            print()
+            for line in step["manual"]:
+                print(f"  {line}")
         if step["trap"]:
             print()
             print(f"  TRAP: {step['trap']}")

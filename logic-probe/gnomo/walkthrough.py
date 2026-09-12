@@ -31,6 +31,7 @@ class Step:
         check: Callable[[], dict[str, Any]],
         fixable: bool = False,
         trap: str | None = None,
+        manual: list[str] | None = None,
     ) -> None:
         self.step_id = step_id
         self.title = title
@@ -39,6 +40,9 @@ class Step:
         self.check = check
         self.fixable = fixable
         self.trap = trap
+        # Shown when the automatic path cannot run. A step the gnome cannot do
+        # for you is still a step you can do yourself.
+        self.manual = manual or []
 
 
 def _check_iac() -> dict[str, Any]:
@@ -129,6 +133,17 @@ STEPS: tuple[Step, ...] = (
         ],
         check=_check_iac,
         fixable=True,
+        manual=[
+            "By hand, if GNOMO cannot reach CoreMIDI:",
+            "  1. Open Audio MIDI Setup.app",
+            "  2. Window > Show MIDI Studio",
+            "  3. Double-click IAC Driver",
+            "  4. Tick 'Device is online'",
+            "  5. Under Ports, click + twice and name them exactly:",
+            "       logic-probe-mcu-cmd",
+            "       logic-probe-mcu-fb",
+            "  6. Apply",
+        ],
     ),
     Step(
         step_id="logic",
@@ -207,6 +222,7 @@ def evaluate() -> list[dict[str, Any]]:
                 "detail": step.detail,
                 "trap": step.trap,
                 "fixable": step.fixable,
+                "manual": step.manual,
                 **result,
             }
         )

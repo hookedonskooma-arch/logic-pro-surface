@@ -105,3 +105,38 @@ def test_cli_setup_names_one_step(capsys, monkeypatch, tmp_path):
     assert payload["current_step"] == "iac"
     assert len(payload["steps"]) == len(walkthrough.STEPS)
     assert payload["tier"] == 0, "checking setup is read-only; it acts for you"
+
+
+def test_failed_fix_still_gives_a_next_step(capsys, monkeypatch, tmp_path):
+    """"Error, no next action" is the one outcome setup must never produce."""
+    from logic_probe import midi_io
+
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "decisions.jsonl")
+    monkeypatch.setattr(
+        midi_io,
+        "ensure_iac_mcu_buses",
+        lambda: {"attempted": True, "error": "coremidi_unavailable:nope"},
+    )
+    assert gnomo_main(["setup", "mcu", "--fix"]) == 0
+    out = capsys.readouterr().out
+    assert "coremidi_unavailable" in out, "must say what broke"
+    assert "step 1 of 5" in out, "must still name the step"
+    assert "Audio MIDI Setup" in out, "must offer the by-hand path"
+
+
+def test_fix_failure_does_not_mark_the_step_done(monkeypatch, tmp_path):
+    from logic_probe import midi_io
+
+    monkeypatch.setenv(mouth.MUTE_ENV, "1")
+    monkeypatch.setattr(ledger, "LEDGER_PATH", tmp_path / "decisions.jsonl")
+    monkeypatch.setattr(
+        midi_io, "ensure_iac_mcu_buses", lambda: {"attempted": True, "error": "boom"}
+    )
+    assert walkthrough.current() is not None
+
+
+def test_first_step_carries_a_by_hand_path():
+    iac = next(s for s in walkthrough.STEPS if s.step_id == "iac")
+    assert iac.manual, "the one auto step needs a manual fallback"
+    assert any("logic-probe-mcu-cmd" in line for line in iac.manual)
