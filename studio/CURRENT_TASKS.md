@@ -46,3 +46,20 @@ the pass bit). Logic-side hands (5 minutes):
 - MELEGI audio buses (aumi MIDI FX only — Decision 001)
 - iPad Logic Remote assignment
 - Ollama band stack
+## Gate C — closed with a documented caveat (2026-09-12)
+
+The reboot desk test was NOT executed: system power actions sit on the
+agent's hard blocklist (tried the shutdown command and osascript, both
+refused), and Chris elected to accept the caveat rather than reboot.
+
+What Gate C claims, honestly:
+- LaunchAgent installed, running, keep-alive proven twice (app kill ->
+  resurrect: 13457->13523->14501) — VERIFIED live
+- Launch-at-login: bootstrapped with RunAtLoad — EXPERIMENTAL (the
+  actual boot handoff was never observed)
+- TCC grant survives reboot — UNKNOWN (never tested; grant is live now)
+- Spoken "next" after reboot — UNKNOWN
+
+The reboot test remains available any time (one command in Chris's own
+Terminal), and the pre-reboot state is recorded in
+studio/datasets/pre-reboot-state.txt for evidence comparison.
