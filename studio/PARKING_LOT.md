@@ -14,3 +14,4 @@ Append with `python -m gnomo park "..."`. Promote an item to
 - [2026-09-12T08:25:31Z] selftest: companion park route works
 - [2026-09-12T08:43:54Z] selftest: companion park route works
 - [2026-09-12T09:13:30Z] selftest: companion park route works
+- [2026-09-12T11:53:00Z] selftest: companion park route works
