@@ -178,14 +178,25 @@ enum ScreenFacts {
 class DragView: NSView {
     var onDragStart: ((NSPoint) -> Void)?
     var onDragMove: ((NSPoint) -> Void)?
+    var onDragEnd: (() -> Void)?
+    var onDragDelta: ((CGFloat) -> Void)?
+    private var lastX: CGFloat = 0
 
     override func mouseDown(with event: NSEvent) {
         window?.makeKey()
+        lastX = NSEvent.mouseLocation.x
         onDragStart?(NSEvent.mouseLocation)
     }
 
     override func mouseDragged(with event: NSEvent) {
+        let nowX = NSEvent.mouseLocation.x
+        onDragDelta?(nowX - lastX)
+        lastX = nowX
         onDragMove?(NSEvent.mouseLocation)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        onDragEnd?()
     }
 }
 
@@ -763,6 +774,7 @@ final class GnomoPanel: NSPanel {
     private var ears: Ears?
     private var pointOverlay: PointOverlay?
     private var poofOverlay: PoofOverlay?
+    private var life: LifeLayer?
     private var gnomeHeight: NSLayoutConstraint?
     private var zoomScale: CGFloat = 1.0
 
@@ -786,15 +798,17 @@ final class GnomoPanel: NSPanel {
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
-        styleMask.insert(.resizable)
         isFloatingPanel = true
         level = .floating
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isOpaque = false
         backgroundColor = .clear
-        setFrameAutosaveName("GnomoPanelFrame")
-        if !setFrameUsingName("GnomoPanelFrame") {
-            setFrame(NSRect(x: 0, y: 0, width: 260, height: 430), display: true)
+        // The gnome is FREE: the panel is a fullscreen transparent stage.
+        // He is never clipped by a frame — zoom, drag, and gestures have the
+        // whole desktop. The UI block (sprite+bubble+input) is constrained
+        // inside this stage and moves as one.
+        if let screen = NSScreen.main {
+            super.setFrame(screen.frame, display: false)
         }
 
         buildUI()
@@ -804,8 +818,13 @@ final class GnomoPanel: NSPanel {
 
     private func buildUI() {
         let root = DragView()
-        root.onDragStart = { [weak self] p in self?.dragAnchor = p }
+        root.onDragStart = { [weak self] p in
+            self?.dragAnchor = p
+            self?.life?.setDragging(true)
+        }
         root.onDragMove = { [weak self] p in self?.windowDragged(to: p) }
+        root.onDragDelta = { [weak self] dx in self?.life?.dragTilt(velocityX: dx * 60) }
+        root.onDragEnd = { [weak self] in self?.life?.setDragging(false) }
 
         gnome.imageScaling = .scaleProportionallyUpOrDown
         gnome.image = NSImage(contentsOf: URL(fileURLWithPath: Gnomo.assetsDir + "/gnome-face.png"))
@@ -836,6 +855,7 @@ final class GnomoPanel: NSPanel {
         badge.alignment = .center
         badge.translatesAutoresizingMaskIntoConstraints = false
 
+        root.addSubview(uiColumn)
         root.addSubview(gnome)
         root.addSubview(bubble)
         root.addSubview(input)
@@ -846,32 +866,77 @@ final class GnomoPanel: NSPanel {
         let gh = gnome.heightAnchor.constraint(equalToConstant: baseGnomeHeight)
         gnomeHeight = gh
 
+        // The stage is fullscreen. The UI block is a movable column anchored
+        // by an explicit frame (uiFrame), not by edge constraints — so the
+        // gnome can live anywhere on the desktop and never be clipped.
         NSLayoutConstraint.activate([
-            root.widthAnchor.constraint(equalToConstant: 260),
+            uiColumn.widthAnchor.constraint(equalToConstant: 260),
 
-            gnome.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
-            gnome.centerXAnchor.constraint(equalTo: root.centerXAnchor),
+            gnome.topAnchor.constraint(equalTo: uiColumn.topAnchor, constant: 10),
+            gnome.centerXAnchor.constraint(equalTo: uiColumn.centerXAnchor),
             gh,
 
             bubble.topAnchor.constraint(equalTo: gnome.bottomAnchor, constant: 6),
-            bubble.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 2),
-            bubble.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -2),
+            bubble.leadingAnchor.constraint(equalTo: uiColumn.leadingAnchor, constant: 2),
+            bubble.trailingAnchor.constraint(equalTo: uiColumn.trailingAnchor, constant: -2),
             bubble.heightAnchor.constraint(greaterThanOrEqualToConstant: 58),
 
             input.topAnchor.constraint(equalTo: bubble.bottomAnchor, constant: 8),
-            input.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 8),
+            input.leadingAnchor.constraint(equalTo: uiColumn.leadingAnchor, constant: 8),
             input.trailingAnchor.constraint(equalTo: micButton.leadingAnchor, constant: -6),
 
             micButton.centerYAnchor.constraint(equalTo: input.centerYAnchor),
-            micButton.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -8),
+            micButton.trailingAnchor.constraint(equalTo: uiColumn.trailingAnchor, constant: -8),
             micButton.widthAnchor.constraint(equalToConstant: 34),
 
             badge.topAnchor.constraint(equalTo: input.bottomAnchor, constant: 6),
-            badge.centerXAnchor.constraint(equalTo: root.centerXAnchor),
-            badge.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -6),
+            badge.centerXAnchor.constraint(equalTo: uiColumn.centerXAnchor),
+            badge.bottomAnchor.constraint(equalTo: uiColumn.bottomAnchor, constant: -6),
         ])
+        uiColumn.translatesAutoresizingMaskIntoConstraints = true
 
+        placeUIColumn(bottomCenter: homeSpot())
+    }
+
+    private let uiColumn = DragView()
+    private var uiHomePoint: NSPoint = NSPoint(x: 640, y: 40)  // bottom-center, screen coords
+    private var uiBottomCenter: NSPoint {
+        get { uiHomePoint }
+        set { uiHomePoint = newValue }
+    }
+
+    /// Position the UI column so its bottom-center sits at the given screen
+    /// point (screen coords, bottom-left origin — same as NSWindow frames).
+    private func placeUIColumn(bottomCenter p: NSPoint) {
+        uiBottomCenter = p
+        let colH = explicitColumnHeight()
+        uiColumn.frame = NSRect(x: 0, y: 0, width: 260, height: colH)
+        // convert bottom-left of the column to the stage's flipped view coords
+        let stageH = rootStageHeight()
+        uiColumn.frame.origin = NSPoint(x: p.x - 130, y: p.y)
+    }
+
+    /// Explicit column height: gnome + bubble(58 min) + input(28) + badge(16)
+    /// + paddings. No fittingSize — that hangs during early layout.
+    private func explicitColumnHeight() -> CGFloat {
+        (baseGnomeHeight * zoomScale) + 10 + 6 + 58 + 8 + 28 + 6 + 16 + 6
+    }
+
+    private func rootStageHeight() -> CGFloat {
+        contentView?.bounds.height ?? (NSScreen.main?.frame.height ?? 1050)
+    }
+
+    private func buildLife() {
         animator = GnomeAnimator(view: gnome)
+        life = LifeLayer(view: gnome, window: self)
+
+        // register the mockup faces for idle looks/blink variants
+        let mock = Gnomo.assetsDir + "/mockup-trans"
+        let base = URL(fileURLWithPath: mock + "-trans/gnomo-idle.png")
+        let variants = ["gnomo-happy", "gnomo-thinking", "gnomo-sleepy"]
+            .map { URL(fileURLWithPath: mock + "/\($0).png") }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        life?.registerFaces(base: base, variants: variants)
 
         ears = Ears()
         ears?.onPartial = { [weak self] text in
@@ -892,16 +957,33 @@ final class GnomoPanel: NSPanel {
         }
 
         pointOverlay = PointOverlay()
+        buildLife()
     }
 
     private func windowDragged(to screenPoint: NSPoint) {
+        // Drag moves the UI column across the fullscreen stage, clamped on-screen.
         let dx = screenPoint.x - dragAnchor.x
         let dy = screenPoint.y - dragAnchor.y
-        var f = frame
-        f.origin.x += dx
-        f.origin.y += dy
-        setFrame(f, display: true)
         dragAnchor = screenPoint
+        var p = uiBottomCenter
+        p.x += dx
+        p.y -= dy  // screen y flips relative to window coords
+        clampSpot(&p)
+        placeUIColumn(bottomCenter: p)
+    }
+
+    private func clampSpot(_ p: inout NSPoint) {
+        guard let screen = NSScreen.main else { return }
+        let v = screen.visibleFrame
+        let colH = explicitColumnHeight()
+        p.x = max(v.minX + 130, min(v.maxX - 130, p.x))
+        p.y = max(v.minY + 40 + colH / 2, min(v.maxY - 60, p.y))
+    }
+
+    private func homeSpot() -> NSPoint {
+        guard let screen = NSScreen.main else { return NSPoint(x: 640, y: 40) }
+        let v = screen.visibleFrame
+        return NSPoint(x: v.midX, y: v.minY + 80)
     }
 
     // MARK: routing — mirrors logic-probe/gnomo/companion_router.py `route()`
@@ -1103,7 +1185,7 @@ final class GnomoPanel: NSPanel {
                 setFaceImage("sequences/\(state)/\(files[0])")
             } else {
                 // no sequence yet: use the mockup static for this state, never a generic idle
-                setFaceImage("mockup/\(staticFaceName(forState: state)).png")
+                setFaceImage("mockup-trans/\(staticFaceName(forState: state)).png")
             }
             return
         }
@@ -1151,11 +1233,11 @@ final class GnomoPanel: NSPanel {
     /// No walking — the gnome materializes near the topic. The destination is
     /// either a named area or the center of a pointed-at window.
     private func teleport(to target: String) {
-        let oldCenter = NSPoint(x: frame.midX, y: frame.minY + 30)
+        let oldSpot = uiBottomCenter
 
         // vanish: poof at the old spot, fade the gnome out
         poofOverlay = poofOverlay ?? PoofOverlay()
-        poofOverlay?.poof(at: oldCenter)
+        poofOverlay?.poof(at: oldSpot)
         animator?.vanish(seconds: 0.35)
         badge.stringValue = "poof…"
         badge.textColor = .secondaryLabelColor
@@ -1163,11 +1245,9 @@ final class GnomoPanel: NSPanel {
         let dest = designatedArea(for: target)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             guard let self else { return }
-            var f = self.frame
-            f.origin = dest
-            self.setFrame(f, display: false)
-            // appear: poof at the new spot, fade the gnome in, drop-in bounce
-            self.poofOverlay?.poof(at: NSPoint(x: f.midX, y: f.minY + 30))
+            self.placeUIColumn(bottomCenter: dest)
+            // appear: poof at the new spot, fade the gnome in, settle bounce
+            self.poofOverlay?.poof(at: dest)
             self.animator?.appear()
             self.badge.stringValue = "GNOMO · here"
             self.badge.textColor = .secondaryLabelColor
@@ -1176,16 +1256,16 @@ final class GnomoPanel: NSPanel {
 
     /// Designated areas: gnome-sized spots tied to screen geography.
     private func designatedArea(for target: String) -> NSPoint {
-        guard let screen = NSScreen.main else { return .zero }
+        guard let screen = NSScreen.main else { return homeSpot() }
         let visible = screen.visibleFrame
         let margin: CGFloat = 40
         switch target {
         case "left":
-            return NSPoint(x: visible.minX + margin, y: visible.minY + 30)
+            return NSPoint(x: visible.minX + margin + 130, y: visible.minY + 80)
         case "right":
-            return NSPoint(x: visible.maxX - frame.width - margin, y: visible.minY + 30)
+            return NSPoint(x: visible.maxX - margin - 130, y: visible.minY + 80)
         case "center", "here":
-            return NSPoint(x: visible.midX - frame.width / 2, y: visible.minY + 30)
+            return NSPoint(x: visible.midX, y: visible.minY + 80)
         default:
             // a topic word: teleport NEAR the window that matches it, lower-center
             let words = target.lowercased()
@@ -1203,20 +1283,18 @@ final class GnomoPanel: NSPanel {
                 if score > bestScore { bestScore = score; best = (c.owner, c.frame) }
             }
             guard let hit = best else {
-                return NSPoint(x: visible.midX - frame.width / 2, y: visible.minY + 30)
+                return NSPoint(x: visible.midX, y: visible.minY + 80)
             }
             // land beside the topic's window: near its lower-center, clamped on-screen
-            let x = max(visible.minX + margin,
-                        min(hit.frame.midX - frame.width / 2,
-                            visible.maxX - frame.width - margin))
-            let y = max(visible.minY + 30, hit.frame.minY - frame.height + 120)
+            var p = NSPoint(x: hit.frame.midX, y: max(visible.minY + 110, hit.frame.minY + 40))
+            clampSpot(&p)
             bubble.text = "Poofed to \(hit.owner)."
-            return NSPoint(x: x, y: y)
+            return p
         }
     }
 
-    /// Walk: animate the panel across the bottom of the screen, waddling
-    /// for the whole trip. "here" is the honest default: screen center.
+    /// Walk: animate the UI column across the screen with a waddle. The stage
+    /// is fullscreen; the column glides, the gnome stays whole.
     private func walk(to target: String) {
         guard let screen = NSScreen.main else { return }
         let visible = screen.visibleFrame
@@ -1224,35 +1302,41 @@ final class GnomoPanel: NSPanel {
         let x: CGFloat
         switch target {
         case "here", "center":
-            x = visible.midX - frame.width / 2
+            x = visible.midX
         case "left":
-            x = visible.minX + margin
+            x = visible.minX + margin + 130
         case "right":
-            x = visible.maxX - frame.width - margin
+            x = visible.maxX - margin - 130
         default: // random
-            x = CGFloat.random(in: visible.minX + margin...(visible.maxX - frame.width - margin))
+            x = CGFloat.random(in: visible.minX + margin + 130...(visible.maxX - margin - 130))
         }
 
-        var dest = frame
-        dest.origin.x = x
-        dest.origin.y = visible.minY + 30
-
-        let distance = hypot(dest.midX - frame.midX, dest.midY - frame.midY)
+        let dest = NSPoint(x: x, y: visible.minY + 110)
+        let start = uiBottomCenter
+        let distance = abs(dest.x - start.x)
         let duration = max(0.8, min(6.0, distance / 180.0))
 
         badge.stringValue = "walking…"
         badge.textColor = .secondaryLabelColor
         animator?.startWaddle(seconds: duration)
 
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = duration
-            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            self.animator().setFrame(dest, display: true)
-        }, completionHandler: { [weak self] in
-            self?.animator?.stopWaddle()
-            self?.badge.stringValue = "GNOMO · here"
-            self?.badge.textColor = .secondaryLabelColor
-        })
+        // animate the column's bottom-center from start to dest
+        let steps = max(12, Int(duration * 30))
+        var i = 0
+        Timer.scheduledTimer(withTimeInterval: duration / Double(steps), repeats: true) { t in
+            i += 1
+            let frac = CGFloat(i) / CGFloat(steps)
+            let eased = frac * frac * (3 - 2 * frac)  // smoothstep
+            var p = start
+            p.x += (dest.x - start.x) * eased
+            self.placeUIColumn(bottomCenter: p)
+            if i >= steps {
+                t.invalidate()
+                self.animator?.stopWaddle()
+                self.badge.stringValue = "GNOMO · here"
+                self.badge.textColor = .secondaryLabelColor
+            }
+        }
     }
 
     /// Zoom: scale the gnome toward screen takeover. The window is a
@@ -1271,39 +1355,14 @@ final class GnomoPanel: NSPanel {
     }
 
     private func applyZoom(animated: Bool) {
-        guard let constraint = gnomeHeight, let root = contentView else { return }
+        guard let constraint = gnomeHeight else { return }
         let newHeight = baseGnomeHeight * zoomScale
 
-        // Feet planted: the window's BOTTOM stays put, the top grows upward.
+        // The stage is fullscreen; zoom grows the gnome inside the UI column.
+        // Bottom (his feet) stays planted, the column stretches upward.
         constraint.constant = newHeight
-        root.layoutSubtreeIfNeeded()
-
-        var fit = root.fittingSize
-        fit.width = max(260, fit.width)
-        var f = frame
-        f.origin.y = f.maxY - fit.height          // bottom fixed (flip coords: minY is bottom)
-        f.size = fit
-        // clamp on-screen
-        if let screen = NSScreen.main {
-            let v = screen.visibleFrame
-            f.origin.y = max(v.minY, min(f.origin.y, screen.frame.maxY - f.height))
-        }
-        let apply = {
-            constraint.constant = newHeight
-            self.setFrame(f, display: true)
-            root.layoutSubtreeIfNeeded()
-        }
-
-        if animated {
-            NSAnimationContext.runAnimationGroup({ ctx in
-                ctx.duration = 0.45
-                ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                ctx.allowsImplicitAnimation = true
-                apply()
-            }, completionHandler: nil)
-        } else {
-            apply()
-        }
+        uiColumn.needsLayout = true
+        placeUIColumn(bottomCenter: uiBottomCenter)
 
         badge.stringValue = zoomScale > 1.05 ? "GNOMO · zoomed \(Int(zoomScale * 100))%" : "GNOMO · normal"
         badge.textColor = .secondaryLabelColor
