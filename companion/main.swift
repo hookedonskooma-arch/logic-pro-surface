@@ -1099,11 +1099,26 @@ final class GnomoPanel: NSPanel {
         let files = (try? FileManager.default.contentsOfDirectory(
             atPath: dir))?.filter { $0.hasSuffix(".png") }.sorted() ?? []
         guard files.count > 1 else {
-            if files.count == 1 { setFaceImage("sequences/\(state)/\(files[0])") }
-            else { setFaceImage(state == "listening" ? "mockup/emote-listening.png" : "mockup/gnomo-idle.png") }
+            if files.count == 1 {
+                setFaceImage("sequences/\(state)/\(files[0])")
+            } else {
+                // no sequence yet: use the mockup static for this state, never a generic idle
+                setFaceImage("mockup/\(staticFaceName(forState: state)).png")
+            }
             return
         }
         playSequence(state: state, files: files)
+    }
+
+    private func staticFaceName(forState state: String) -> String {
+        switch state {
+        case "happy": return "gnomo-happy"
+        case "thinking": return "gnomo-thinking"
+        case "confused": return "gnomo-confused"
+        case "error": return "gnomo-error"
+        case "listening": return "emote-listening"
+        default: return "gnomo-idle"
+        }
     }
 
     private var seqTimer: Timer?
