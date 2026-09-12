@@ -1066,7 +1066,14 @@ final class GnomoPanel: NSPanel {
     ///   T0 act -> happy · T1 propose -> thinking · T2 ask -> confused
     ///   T3 never -> error · listening -> emote-listening · failure -> error
     private func setFace(forTier tier: Int) {
-        setFaceImage("mockup/\(faceName(forTier: tier)).png")
+        let name: String
+        switch tier {
+        case 0: name = "happy"
+        case 1: name = "thinking"
+        case 2: name = "confused"
+        default: name = "error"
+        }
+        setFaceState(name)
     }
 
     private func faceName(forTier tier: Int) -> String {
@@ -1079,7 +1086,41 @@ final class GnomoPanel: NSPanel {
     }
 
     private func setListeningFace(_ listening: Bool) {
-        setFaceImage(listening ? "mockup/emote-listening.png" : "mockup/gnomo-idle.png")
+        setFaceState(listening ? "listening" : "idle")
+    }
+
+    /// Frame player: if a rendered alpha sequence exists for the state
+    /// (companion/assets/sequences/<state>/*.png), loop it; otherwise fall
+    /// back to the static bust. Sequences come from the CA export (Stage 3).
+    private func setFaceState(_ state: String) {
+        seqTimer?.invalidate()
+        seqTimer = nil
+        let dir = Gnomo.assetsDir + "/sequences/" + state
+        let files = (try? FileManager.default.contentsOfDirectory(
+            atPath: dir))?.filter { $0.hasSuffix(".png") }.sorted() ?? []
+        guard files.count > 1 else {
+            if files.count == 1 { setFaceImage("sequences/\(state)/\(files[0])") }
+            else { setFaceImage(state == "listening" ? "mockup/emote-listening.png" : "mockup/gnomo-idle.png") }
+            return
+        }
+        playSequence(state: state, files: files)
+    }
+
+    private var seqTimer: Timer?
+    private var seqIndex = 0
+    private var seqFiles: [String] = []
+    private var seqState = ""
+
+    private func playSequence(state: String, files: [String]) {
+        seqState = state
+        seqFiles = files
+        seqIndex = 0
+        seqTimer = Timer.scheduledTimer(withTimeInterval: 0.18, repeats: true) { [weak self] t in
+            guard let self, self.seqState == state else { t.invalidate(); return }
+            let f = self.seqFiles[self.seqIndex % self.seqFiles.count]
+            self.setFaceImage("sequences/\(state)/\(f)")
+            self.seqIndex += 1
+        }
     }
 
     private func setFaceImage(_ relPath: String) {
