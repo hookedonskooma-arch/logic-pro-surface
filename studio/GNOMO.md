@@ -160,5 +160,7 @@ Unchanged by this file, and not a to-do list:
 - Assign Mackie Control. That is Chris at the Mac
   ([CURRENT_TASKS.md](CURRENT_TASKS.md)).
 
+Where the mouth goes next: [VOICE_TEARDOWN.md](VOICE_TEARDOWN.md).
+
 A companion that decides is not a companion that knows more. It knows exactly
 what it knew before, and now it is honest about who gets to act on it.
