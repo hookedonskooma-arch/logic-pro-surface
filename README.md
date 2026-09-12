@@ -12,6 +12,8 @@ Studio workforce memory is [studio/](studio/). Roles, honest MCP checkboxes, tas
 
 Spoken mouth (v0): macOS `say`, not MELEGI. See [studio/VOICE.md](studio/VOICE.md).
 
+Companion: [GNOMO](studio/GNOMO.md) — one gnome, one mouth, one decision ladder. Tier 0 acts for you, tier 1 acts with you on a nod and a rollback, tier 2 is yours, tier 3 is never. Unmatched actions fail closed to tier 2. It still cannot hear audio and still cannot read a Logic project.
+
 ## Status tags
 
 We never collapse these into "supported":
@@ -54,6 +56,35 @@ JSON always includes `before`, `adapter_result`, `readback`, `verification`, and
 
 Without Logic, `status` is `uncertain`. The process exiting 0 only means an envelope was printed — that is adapter-level, not semantic success. `confirmed` requires independent MCU echo (`readback.method=mcu_feedback`). AX receipts cannot be the pass bit. Mixer `-6 dB` is an MCU fader, not MELEGI audio pass-through. See [docs/MCU.md](docs/MCU.md).
 
+## Companion
+
+On a Mac, one paste sets everything up and runs the MCU walkthrough:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/hookedonskooma-arch/logic-pro-surface/claude/logic-pro-gnome-companion-vsp930/scripts/gnomo-setup.sh)
+```
+
+Or, if the repo is already cloned: `bash scripts/gnomo-setup.sh`. It finds or
+clones the repo, builds an isolated venv (modern macOS Pythons are PEP 668
+"externally managed", so a plain `pip3 install` fails with a wall of red text
+that is not your fault), installs the MIDI libraries, and leaves a `./gnomo`
+command so `PYTHONPATH` never has to be typed again.
+
+```bash
+PYTHONPATH=logic-probe python -m gnomo next
+PYTHONPATH=logic-probe python -m gnomo decide "set track 3 to -6 dB"
+PYTHONPATH=logic-probe python -m gnomo park "chop the intro tighter"
+```
+
+Exit 0 means a decision was printed — read `tier` for the semantics, the same
+way you read `status` on a probe envelope. `tier` is `0` act / `1` propose /
+`2` ask / `3` refuse, and an action that matches no rung is `2`, never `0`.
+Off macOS the mouth reports `spoke: false`; printed text is not speech. Every
+decision appends to `studio/datasets/decisions.jsonl`.
+
+See [studio/GNOMO.md](studio/GNOMO.md) and the pasteable bot prompt at
+[grok/GNOMO_SYSTEM_PROMPT.md](grok/GNOMO_SYSTEM_PROMPT.md).
+
 ## Tests
 
 ```bash
@@ -71,6 +102,7 @@ Live-Logic tests (`pytest -m live_logic`) fail closed when Logic is absent. They
 - `audio-unit/` — Apple-shaped MIDI FX stub (4-note phrase C3 E3 G3 C4).
 - `audio-unit/melegi/` — extracted MELEGI JUCE AU MIDI FX only. Not TTS, not audio pass-through, not Ollama. See [docs/MELEGI-EXTRACTION.md](docs/MELEGI-EXTRACTION.md).
 - `logic-probe/` — Python harness.
-- `grok/` — bot prompt, source policy, promotion gates.
+- `grok/` — bot prompts (engineer + companion), source policy, promotion gates.
+- `logic-probe/gnomo/` — GNOMO companion: decision ladder, voice, grounding, ledger.
 
 Scripter is JavaScript. MIDI Device Scripts are Lua. Do not bring Ollama, songs, or a VST-first path into this repo.

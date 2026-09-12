@@ -9,6 +9,8 @@ Chris: assign Mackie Control in Logic Pro > Control Surfaces > Setup.
 - Input: IAC Driver `logic-probe-mcu-cmd`
 - Output: IAC Driver `logic-probe-mcu-fb`
 - Do **not** Rebuild Defaults (would wipe iPad Logic Remote).
+- Stuck? `PYTHONPATH=logic-probe python3 -m gnomo setup mcu` prints one step at a time.
+  `--fix` lets GNOMO create the two IAC buses itself; the Logic window still needs hands.
 
 ## NEXT
 
