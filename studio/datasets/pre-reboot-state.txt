@@ -1,0 +1,11 @@
+PRE-REBOOT STATE (2026-09-12, before Gate C reboot test)
+main @ 785ff11 (clean, pushed)
+LaunchAgent studio.gnomo.companion: running, keep-alive proven twice
+Gnomo window: pid 14501, on desk
+TCC: speech=2 mic=2 for studio.gnomo.companion
+Suite: 173 passed, 1 skipped | selftest exit 0
+Seam: sent 34 notes over IAC Bus 1, status=uncertain (no capture yet - honest)
+EXPECTED POST-REBOOT:
+  - gnome window unaided within ~60s of login (LaunchAgent RunAtLoad)
+  - TCC grants still auth=2 (same ad-hoc signature)
+  - agent state=running, no relaunch loop
