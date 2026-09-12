@@ -45,17 +45,80 @@ class Rule:
         reason: str,
         rollback: str | None = None,
         needs: tuple[str, ...] = (),
+        also: str | None = None,
+        unless: str | None = None,
     ) -> None:
         self.tier = tier
         self.pattern = re.compile(pattern, re.IGNORECASE)
         self.reason = reason
         self.rollback = rollback
         self.needs = needs
+        # `also` must match too; `unless` disqualifies the rung. Together they
+        # let a rung turn on what is being acted upon, not just the verb.
+        self.also = re.compile(also, re.IGNORECASE) if also else None
+        self.unless = re.compile(unless, re.IGNORECASE) if unless else None
 
+    def matches(self, action: str) -> bool:
+        if not self.pattern.search(action):
+            return False
+        if self.also is not None and not self.also.search(action):
+            return False
+        if self.unless is not None and self.unless.search(action):
+            return False
+        return True
+
+
+# Hearing the human is not hearing the mix. The line is drawn by OBJECT, not
+# by verb: "listen" is not the dangerous word, what is being listened to is.
+# The ears vocabulary, defined once. The tier-3 refusal below uses it, and the
+# allow rung uses it as a guard - so widening one can never silently widen the
+# other. A transcription ask that also asks "is it good" is a judgement ask.
+EARS = (
+    r"\b(hear|hearing|heard|listen(ed|ing|s)?|audition|ears?)\b"
+    r"|\bsound(s|ed|ing)?\b"
+    r"|\b(better|worse|good|bad)\b"
+)
+
+TRANSCRIBE = (
+    r"\b(transcribe|transcription|dictate|dictation|speech[-\s]?to[-\s]?text"
+    r"|voice (note|memo)|note this down|what did i (just )?say|stt)\b"
+)
+
+# Name any of these and it is audio analysis, not taking down your words.
+MUSICAL_OBJECT = (
+    # "take" only as a noun: "the take", "vocal take" - never the verb in
+    # "take a voice note", which is the whole point of the allow rung.
+    r"\b(?:the|that|this|a|another|second|third|last|first|vocal|guitar|drum)\s+takes?\b"
+    r"|\b(mix|mixes|track|tracks|stems?|regions?|songs?|beats?|master"
+    r"|bus|buses|vocals?|guitars?|bass|drums?|snare|kick|hats?|808s?|synths?"
+    r"|riffs?|tone|eq|reverb|compressor|loudness|lufs|arrangement)\b"
+)
 
 # Order is authority order: REFUSE is checked first, ACT last. A phrase that
 # trips a refusal never falls through to a softer rung.
 RULES: tuple[Rule, ...] = (
+    # --- the hearing line: your voice, never the mix -----------------------
+    # Deliberately narrow, and it fails closed: transcription intent AND no
+    # musical object named. Miss either half and it drops to the twin below.
+    Rule(
+        tier=TIER_ACT,
+        pattern=TRANSCRIBE,
+        unless=f"{MUSICAL_OBJECT}|{EARS}",
+        reason=(
+            "transcribing your speech is not metering audio; it returns text, "
+            "never a judgement about how anything sounds"
+        ),
+    ),
+    Rule(
+        tier=TIER_REFUSE,
+        pattern=TRANSCRIBE,
+        also=MUSICAL_OBJECT,
+        reason=(
+            "transcribing a musical object is audio analysis, not taking down "
+            "your words; this layer still has no ears for the mix"
+        ),
+    ),
+
     # --- tier 3: never -----------------------------------------------------
     Rule(
         tier=TIER_REFUSE,
@@ -63,10 +126,7 @@ RULES: tuple[Rule, ...] = (
         # wearing a read's clothes, and a read is tier 0. A false refusal costs
         # one sentence; a false ACT ships the exact lie this repo was built to
         # stop. Any judgement of sound is a no, however it is phrased.
-        pattern=(
-            r"\b(hear|hearing|heard|listen(ed|ing|s)?|audition|ears?)\b"
-            r"|\bsound(s|ed|ing)?\b"
-        ),
+        pattern=EARS,
         reason="this layer has no ears; claiming a listen is the lie the repo exists to stop",
     ),
     Rule(
@@ -214,7 +274,7 @@ def _utc_now_iso() -> str:
 def classify(action: str) -> Rule | None:
     """First matching rule in authority order, or None for the fail-closed default."""
     for rule in RULES:
-        if rule.pattern.search(action):
+        if rule.matches(action):
             return rule
     return None
 

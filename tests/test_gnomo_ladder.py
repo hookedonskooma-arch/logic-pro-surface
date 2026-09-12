@@ -240,3 +240,56 @@ def test_cli_empty_ask_exits_nonzero_without_traceback(capsys, monkeypatch):
     monkeypatch.setenv(mouth.MUTE_ENV, "1")
     assert gnomo_main(["decide", "   "]) == 2
     assert "GNOMO:" in capsys.readouterr().err
+
+
+# --- the hearing line ----------------------------------------------------
+#
+# Every allow case ships next to its refusing twin. A regex widened later
+# breaks a test here instead of quietly breaking the promise.
+
+HEARING_PAIRS = [
+    ("take a voice note", "transcribe the guitar take"),
+    ("transcribe what I just said", "transcribe the mix"),
+    ("what did I just say", "what did that take sound like"),
+    ("voice memo this idea", "dictate a note about the snare"),
+    ("note this down", "transcribe the vocal take"),
+]
+
+
+@pytest.mark.parametrize("allowed,refused", HEARING_PAIRS)
+def test_hearing_the_human_is_allowed(allowed, refused):
+    """Transcribing Chris is text out. It is not metering audio."""
+    assert decide(allowed)["tier"] == TIER_ACT, allowed
+
+
+@pytest.mark.parametrize("allowed,refused", HEARING_PAIRS)
+def test_hearing_the_mix_stays_refused(allowed, refused):
+    """Name a musical object and it is audio analysis, whatever the verb."""
+    assert decide(refused)["tier"] == TIER_REFUSE, refused
+
+
+def test_transcription_never_reaches_a_judgement():
+    """Text out, never an opinion. 'Sounds good' is refused however asked."""
+    for action in (
+        "transcribe this and tell me if it sounds good",
+        "listen and say whether the take is better",
+    ):
+        assert decide(action)["tier"] == TIER_REFUSE, action
+
+
+def test_the_verb_take_is_not_a_musical_take():
+    """'take a voice note' must not trip on the noun 'take'."""
+    assert decide("take a voice note")["tier"] == TIER_ACT
+    assert decide("transcribe that take")["tier"] == TIER_REFUSE
+
+
+def test_bare_hearing_words_are_still_refused():
+    """Widening for transcription must not reopen the old hole."""
+    for action in ("give it a listen", "how does the guitar sound", "did you hear that"):
+        assert decide(action)["tier"] == TIER_REFUSE, action
+
+
+def test_allow_rung_sits_above_its_refusing_twin():
+    """Order is load-bearing: the narrow allow is checked before the refusal."""
+    tiers = [r.tier for r in RULES[:2]]
+    assert tiers == [TIER_ACT, TIER_REFUSE], tiers

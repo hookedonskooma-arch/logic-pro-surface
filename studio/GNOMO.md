@@ -38,7 +38,7 @@ what may be **done without asking**. Same rules, other axis.
 | 0 | `act` | **for** you | Reversible, verifiable, writes nothing into a Logic project | run a probe, read state, park an idea, speak, run tests |
 | 1 | `propose` | **with** you | Reversible in Logic, with a stated rollback; runs on one nod | MCU fader, transport, insert MIDI FX on a scratch track, mute/solo/pan |
 | 2 | `ask` | **you** decide | Taste, an UNKNOWN tag, or no rollback | arrangement, mastering, anything destructive, control-surface setup, shipping |
-| 3 | `refuse` | **never** | Not done, and not negotiated about | claiming a listen, AX as musical truth, Rebuild Defaults, MELEGI audio, inventing state |
+| 3 | `refuse` | **never** | Not done, and not negotiated about | judging how audio sounds, AX as musical truth, Rebuild Defaults, MELEGI audio, inventing state |
 
 Three properties make this safe to run unattended:
 
@@ -56,6 +56,31 @@ Three properties make this safe to run unattended:
 Blockers from [PROJECT_STATE.md](PROJECT_STATE.md) ride along on every
 decision. A tier-1 nod does not get executed while its blocker stands; the
 gnome says what has to clear first.
+
+## The hearing line
+
+**GNOMO may hear you. GNOMO may never hear the mix.** (Decision 006, Chris's
+call - it changes what the companion may do, so it was not GNOMO's to make.)
+
+Transcribing speech returns text. Metering audio returns a judgement. Those are
+different acts, and the ladder draws the line by **object, not verb** - "listen"
+is not the dangerous word, *what is being listened to* is.
+
+| Ask | Lands |
+| --- | --- |
+| "take a voice note" | tier 0 |
+| "transcribe what I just said" | tier 0 |
+| "transcribe the guitar take" | tier 3 - names a musical object |
+| "transcribe this and tell me if it sounds good" | tier 3 - asks for a judgement |
+| "how does the mix sound" | tier 3 - unchanged |
+
+Two guards, and missing **either** refuses: no musical object, and no judgement
+word. The judgement guard reuses the *same* `EARS` constant as the tier-3
+refusal, so widening one cannot silently widen the other.
+
+Tested as pairs: every allowed phrasing ships beside its refusing twin, so a
+regex loosened later breaks a test instead of a promise. The capability matrix
+keeps two separate rows and [they are never merged](../docs/CAPABILITY_MATRIX.md).
 
 ## Speech rules
 

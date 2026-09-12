@@ -34,6 +34,7 @@ Target host for later live rows: macOS, Logic Pro 12.3.
 | GNOMO decision ladder (tier 0-3) | repo-local rules | none | decision record in `studio/datasets/decisions.jsonl` | EXPERIMENTAL | — | — | Touches no Logic surface. Unmatched action fails closed to tier 2; tier 1 without a stated rollback is downgraded. Unit-tested, not a live claim. |
 | GNOMO spoken mouth | macOS `say` via `scripts/speak.py` | none | `say` returncode + `spoken.jsonl` | EXPERIMENTAL | — | macOS | One mouth, reused. Off macOS reports `spoke: false`. Printed text is not speech. Not a singing model, not a voice clone. |
 | GNOMO guided MCU setup (steps 3-4, in Logic's window) | none (human hands) | none | none available | UNKNOWN | — | — | `com.apple.logic.pro.cs` is an undocumented hint Logic may not flush until quit; it cannot close a step. E06 echo is the only pass bit. |
-| GNOMO hearing / judging audio | — | — | — | VERIFIED absent | — | — | No ears at any tier. Refused as tier 3 however phrased, including a hearing request worded as a read. |
+| GNOMO hearing / judging audio | — | — | — | VERIFIED absent | — | — | No ears on the mix, at any tier. Refused as tier 3 however phrased, including a hearing request worded as a read or wrapped in a transcription ask. |
+| GNOMO transcribing the human's speech | local STT (whisper.cpp / faster-whisper) | none | the text it returns | UNKNOWN | — | — | Decision 006. Tier 0, and only when no musical object and no judgement word appears. Returns text, never an opinion. Not wired up here; the chatbot branch holds the recognizers. **Never merge this row with the one above.** |
 
 Status vocabulary: [SURFACE.md](../SURFACE.md). Contract: [HONEST_CONTRACT.md](HONEST_CONTRACT.md).
