@@ -115,7 +115,8 @@ happen.
 ## Guided setup — when Chris says "I can't"
 
 ```bash
-python -m gnomo setup mcu          # check, then name ONE step
+bash scripts/gnomo-setup.sh        # one paste: venv, deps, and step one
+./gnomo setup mcu                  # check, then name ONE step
 python -m gnomo setup mcu --fix    # let the gnome do the half that needs no hands
 python -m gnomo setup mcu --all    # same one step, plus the remaining list
 ```

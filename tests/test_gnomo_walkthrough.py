@@ -140,3 +140,33 @@ def test_first_step_carries_a_by_hand_path():
     iac = next(s for s in walkthrough.STEPS if s.step_id == "iac")
     assert iac.manual, "the one auto step needs a manual fallback"
     assert any("logic-probe-mcu-cmd" in line for line in iac.manual)
+
+
+def test_bootstrap_script_is_runnable(repo_root):
+    """The one-paste path is the whole point; a broken script blocks everything."""
+    import os
+    import subprocess
+
+    script = repo_root / "scripts" / "gnomo-setup.sh"
+    assert script.is_file(), "bootstrap script missing"
+    assert os.access(script, os.X_OK), "bootstrap script is not executable"
+    proc = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+
+
+def test_bootstrap_uses_a_venv_not_system_pip(repo_root):
+    """A bare `pip3 install` dies on PEP 668 macOS. That was the blocker.
+
+    Comments may name pip3 to explain why we avoid it; executable lines may not
+    call it.
+    """
+    body = (repo_root / "scripts" / "gnomo-setup.sh").read_text()
+    assert "python3 -m venv" in body, "must build an isolated venv"
+    code = [
+        line
+        for line in body.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    offenders = [line for line in code if "pip3" in line]
+    assert not offenders, f"system pip3 called: {offenders}"
+    assert any('"$PY" -m pip install' in line for line in code), "install via the venv python"

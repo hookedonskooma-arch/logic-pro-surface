@@ -58,6 +58,18 @@ Without Logic, `status` is `uncertain`. The process exiting 0 only means an enve
 
 ## Companion
 
+On a Mac, one paste sets everything up and runs the MCU walkthrough:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/hookedonskooma-arch/logic-pro-surface/claude/logic-pro-gnome-companion-vsp930/scripts/gnomo-setup.sh)
+```
+
+Or, if the repo is already cloned: `bash scripts/gnomo-setup.sh`. It finds or
+clones the repo, builds an isolated venv (modern macOS Pythons are PEP 668
+"externally managed", so a plain `pip3 install` fails with a wall of red text
+that is not your fault), installs the MIDI libraries, and leaves a `./gnomo`
+command so `PYTHONPATH` never has to be typed again.
+
 ```bash
 PYTHONPATH=logic-probe python -m gnomo next
 PYTHONPATH=logic-probe python -m gnomo decide "set track 3 to -6 dB"
