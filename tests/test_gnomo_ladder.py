@@ -240,3 +240,36 @@ def test_cli_empty_ask_exits_nonzero_without_traceback(capsys, monkeypatch):
     monkeypatch.setenv(mouth.MUTE_ENV, "1")
     assert gnomo_main(["decide", "   "]) == 2
     assert "GNOMO:" in capsys.readouterr().err
+
+
+# --- compound asks -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        "read the mixer and bounce the project",
+        "list tracks; save over the session",
+        "check the mix then quantize all regions",
+        "show the status, frobnicate the widget",
+    ],
+)
+def test_tier0_word_cannot_launder_an_unmatched_clause(action):
+    """A read in one clause is not permission for the unknown clause beside it."""
+    assert decide(action)["tier"] == TIER_ASK
+
+
+def test_compound_takes_the_strictest_clause():
+    assert decide("show the tempo, then delete track 3")["tier"] == TIER_ASK
+    assert decide("read the envelope and fake the loudness")["tier"] == TIER_REFUSE
+    assert decide("read the envelope and run the tests")["tier"] == TIER_ACT
+
+
+def test_two_proposals_need_two_nods():
+    d = decide("set the fader to -6 dB and mute track 2")
+    assert d["tier"] == TIER_ASK
+    assert d["downgraded"]
+
+
+def test_decimal_db_is_one_clause():
+    assert decide("set the fader to -6.5 dB")["tier"] == TIER_PROPOSE
