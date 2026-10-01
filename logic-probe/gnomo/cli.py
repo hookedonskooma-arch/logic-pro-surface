@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import ledger, mouth, persona, state, walkthrough
+from . import hands, ledger, mouth, persona, state, walkthrough
 from .ladder import TIER_ACT, TIER_REFUSE, decide
 from .music_plan import MusicPlanError, load_plan, plan_from_json
 from .midi_compiler import compile_plan, write_smf
@@ -106,6 +106,46 @@ def cmd_decide(args: argparse.Namespace) -> int:
     )
     decision["command"] = "decide"
     return _emit(decision, persona.line(decision), as_json=args.json, quiet=args.quiet)
+
+
+def _hands_line(record: dict[str, Any]) -> str:
+    """What the gnome says about a hands request, in one breath."""
+    verb, result = record["hands"]["verb"], record.get("result") or {}
+    if record["tier"] == TIER_REFUSE:
+        return f"No. {record['reason']}."
+    status, reason = result.get("status"), result.get("reason")
+    if reason == "not_macos":
+        return "My hands only work on the Mac. Nothing was touched."
+    if reason == "helper_not_built":
+        return f"My hands aren't built yet. Run {hands.BUILD_HINT} on the Mac."
+    if reason == "needs_accessibility_permission":
+        return "macOS hasn't let me use my hands. Allow gnomo-hands under Privacy, Accessibility."
+    if reason == "declined_by_human":
+        return "You said not now. Nothing was touched."
+    if reason == "human_took_over":
+        return "You were moving, so I let go. Nothing was touched."
+    if reason == "ambiguous":
+        return "More than one thing matches. Pick one with --index."
+    if reason == "not_found":
+        return f"I can't see that in {result.get('app', 'the front app')}."
+    if verb in ("look", "find") and result.get("ok"):
+        return f"I see {len(result.get('elements') or [])} things in {result.get('app')}."
+    if status == "attempted":
+        label = (result.get("target") or {}).get("label")
+        what = f" {label}" if label else ""
+        return f"Done{what}, via {result.get('channel')}. That's a receipt, not proof it took."
+    return f"Hands {verb} did not run ({reason or status})."
+
+
+def cmd_hands(args: argparse.Namespace) -> int:
+    target = " ".join(args.target).strip()
+    try:
+        record = hands.run(args.verb, target, index=args.index)
+    except ValueError as exc:
+        print(f"hands: {exc}", file=sys.stderr)
+        return 2
+    record["command"] = "hands"
+    return _emit(record, _hands_line(record), as_json=args.json, quiet=args.quiet)
 
 
 def cmd_say(args: argparse.Namespace) -> int:
@@ -376,6 +416,15 @@ def _parser() -> argparse.ArgumentParser:
     dec = sub.add_parser("decide", help="put one action on the ladder")
     dec.add_argument("action")
     dec.set_defaults(func=cmd_decide)
+
+    hnd = sub.add_parser(
+        "hands",
+        help="look at / point at things in the front app; click, type, key only after a human 'Do it'",
+    )
+    hnd.add_argument("verb", choices=hands.VERBS)
+    hnd.add_argument("target", nargs="*", help="label to find/point/click, text to type, or a key combo")
+    hnd.add_argument("--index", type=int, help="which match, when a label matches more than one thing")
+    hnd.set_defaults(func=cmd_hands)
 
     say = sub.add_parser("say", help="speak a line in the gnome's voice")
     say.add_argument("text")
