@@ -219,6 +219,17 @@ def classify(action: str) -> Rule | None:
     return None
 
 
+# Compound asks ("read the mixer and bounce the project") are judged clause by
+# clause, so a harmless tier-0 word cannot launder an unmatched clause into an act.
+_CLAUSE_SPLIT = re.compile(r"\s*(?:[,;&]|\.(?=\s|$)|\b(?:and|then|also|plus)\b)\s*", re.IGNORECASE)
+
+
+def clauses(action: str) -> list[str]:
+    """The separate asks inside one action; never empty for a non-empty action."""
+    parts = [p for p in _CLAUSE_SPLIT.split(action) if p.strip()]
+    return parts or [action]
+
+
 def decide(
     action: str,
     *,
@@ -235,14 +246,20 @@ def decide(
     if not action:
         raise ValueError("decide() needs an action; the gnome does not guess the ask")
 
-    rule = classify(action)
-    if rule is None:
+    # The strictest clause decides. An unmatched clause is tier 2, never skipped.
+    matched = [classify(part) for part in clauses(action)]
+    worst = max(matched, key=lambda r: TIER_ASK if r is None else r.tier)
+    if worst is None or (worst.tier < TIER_ASK and None in matched):
         tier, reason, rollback, needs = TIER_ASK, DEFAULT_REASON, None, ("a clearer ask",)
     else:
-        tier, reason, rollback, needs = rule.tier, rule.reason, rule.rollback, rule.needs
+        tier, reason, rollback, needs = worst.tier, worst.reason, worst.rollback, worst.needs
 
     downgraded = None
-    if tier == TIER_PROPOSE and not rollback:
+    proposals = {id(r) for r in matched if r is not None and r.tier == TIER_PROPOSE}
+    if tier == TIER_PROPOSE and len(proposals) > 1:
+        tier = TIER_ASK
+        downgraded = "several tier-1 moves need several rollbacks; one nod covers one move"
+    elif tier == TIER_PROPOSE and not rollback:
         tier = TIER_ASK
         downgraded = "tier 1 without a stated rollback is not actionable; handed back"
 
